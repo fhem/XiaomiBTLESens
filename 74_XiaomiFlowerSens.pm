@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.1.51";
+my $version = "0.1.54";
 
 
 
@@ -169,6 +169,7 @@ sub XiaomiFlowerSens_stateRequest($) {
 
     my ($hash)      = @_;
     
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" );
     XiaomiFlowerSens($hash);
 }
 
@@ -259,7 +260,6 @@ sub XiaomiFlowerSens_gattCharRead($$) {
     my ($mac,$wfr)       = @_;
     
     
-    
     my $loop = 0;
     while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         printf "\n(Sub XiaomiFlowerSens_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
@@ -267,11 +267,10 @@ sub XiaomiFlowerSens_gattCharRead($$) {
         $loop++;
     }
     
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_Done ($name) - WriteForRead: $wfr";
+    #printf "\n\nSub XiaomiFlowerSens - WriteForRead: $wfr";
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
     my $wresp       = qx(gatttool -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
-    Log3 $name, 4, "Sub XiaomiFlowerSens_Done ($name) - WriteResponse: $wresp";
+    #printf "\nSub XiaomiFlowerSens - WriteResponse: $wresp\n\n";
     
     my @readData        = split(": ",qx(gatttool -b $mac --char-read -a 0x35));
     
@@ -292,13 +291,13 @@ sub XiaomiFlowerSens_readBatFW($) {
 
     my ($mac)   = @_;
     
+    
     my $loop = 0;
     while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         printf "\n(Sub XiaomiFlowerSens_Run) - gatttool noch aktiv, wait 0.5s for new check\n";
         sleep 0.5;
         $loop++;
     }
-    
     
     my @readData        = split(": ",qx(gatttool -b $mac --char-read -a 0x38));
     
@@ -368,7 +367,7 @@ sub XiaomiFlowerSens_Done($) {
     readingsBulkUpdate($hash, "moisture", $response_json->{moisture});
     readingsBulkUpdate($hash, "fertility", $response_json->{fertility});
     readingsBulkUpdate($hash, "firmware", $response_json->{firmware});
-    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" );
+    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" or ReadingsVal($name,"state", 0) eq "unreachable" );
     readingsEndUpdate($hash,1);
     
     
