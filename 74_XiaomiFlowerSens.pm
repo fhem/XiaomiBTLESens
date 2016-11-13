@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.1.54";
+my $version = "0.1.55";
 
 
 
@@ -168,6 +168,7 @@ sub XiaomiFlowerSens_Attr(@) {
 sub XiaomiFlowerSens_stateRequest($) {
 
     my ($hash)      = @_;
+    my $name        = $hash->{NAME};
     
     readingsSingleUpdate ( $hash, "state", "active", 1 ) if( ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" );
     XiaomiFlowerSens($hash);
