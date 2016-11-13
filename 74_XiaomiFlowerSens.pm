@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.1.55";
+my $version = "0.1.56";
 
 
 
@@ -214,8 +214,14 @@ sub XiaomiFlowerSens($) {
     
     my $name    = $hash->{NAME};
     my $mac     = $hash->{BTMAC};
-    my $wfr     = 1 if( ReadingsVal($name, "firmware", 0) ne "2.6.2" );
+    my $wfr;
     
+    
+    if( ReadingsVal($name, "firmware", 0) eq "2.6.6" ) {
+        $wfr    = 1;
+    } else {
+        $wfr    = 0;
+    }
 
     BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
         
