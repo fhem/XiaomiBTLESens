@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.1.56";
+my $version = "0.1.59";
 
 
 
@@ -87,7 +87,7 @@ sub XiaomiFlowerSens_Define($$) {
     if( $init_done ) {
         XiaomiFlowerSens_stateRequestTimer($hash);
     } else {
-        InternalTimer( gettimeofday()+25, "XiaomiFlowerSens_stateRequestTimer", $hash, 0 );
+        InternalTimer( gettimeofday()+int(rand(30))+15, "XiaomiFlowerSens_stateRequestTimer", $hash, 0 );
     }
     
     Log3 $name, 3, "XiaomiFlowerSens ($name) - defined with BTMAC $hash->{BTMAC}";
@@ -185,7 +185,7 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
     XiaomiFlowerSens($hash);
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}, "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
+    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
 }
 
 sub XiaomiFlowerSens_Set($$@) {
