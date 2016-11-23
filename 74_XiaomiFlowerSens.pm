@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.1.59";
+my $version = "0.2.0";
 
 
 
@@ -51,6 +51,7 @@ sub XiaomiFlowerSens_Initialize($) {
     $hash->{AttrFn}	    = "XiaomiFlowerSens_Attr";
     $hash->{AttrList} 	    = "interval ".
                               "disable:1 ".
+                              "hciDevice:hci0,hci1,hci2 ".
                               $readingFnAttributes;
 
 
@@ -265,6 +266,7 @@ sub XiaomiFlowerSens_Run($) {
 sub XiaomiFlowerSens_gattCharRead($$) {
 
     my ($mac,$wfr)       = @_;
+    my $hci              = ReadingsVal($name,"hciDevice","hci0")
     
     
     my $loop = 0;
@@ -276,10 +278,10 @@ sub XiaomiFlowerSens_gattCharRead($$) {
     
     #printf "\n\nSub XiaomiFlowerSens - WriteForRead: $wfr";
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
-    my $wresp       = qx(gatttool -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
+    my $wresp       = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
     #printf "\nSub XiaomiFlowerSens - WriteResponse: $wresp\n\n";
     
-    my @readData        = split(": ",qx(gatttool -b $mac --char-read -a 0x35));
+    my @readData        = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35));
     
     return (undef,undef,undef,undef)
     unless( defined($readData[0]) );
@@ -297,6 +299,7 @@ sub XiaomiFlowerSens_gattCharRead($$) {
 sub XiaomiFlowerSens_readBatFW($) {
 
     my ($mac)   = @_;
+    my $hci     = ReadingsVal($name,"hciDevice","hci0")
     
     
     my $loop = 0;
@@ -306,7 +309,7 @@ sub XiaomiFlowerSens_readBatFW($) {
         $loop++;
     }
     
-    my @readData        = split(": ",qx(gatttool -b $mac --char-read -a 0x38));
+    my @readData        = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38));
     
     return (undef,undef,undef,undef)
     unless( defined($readData[0]) );
