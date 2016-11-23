@@ -248,10 +248,10 @@ sub XiaomiFlowerSens_Run($) {
 
 
     ##### Abruf des aktuellen Status
-    my ($temp,$lux,$moisture,$fertility)  = XiaomiFlowerSens_gattCharRead($mac,$wfr);
+    my ($temp,$lux,$moisture,$fertility)  = XiaomiFlowerSens_gattCharRead($name,$mac,$wfr);
     
     ###### Batteriestatus einlesen    
-    my ($blevel,$fw) = XiaomiFlowerSens_readBatFW($mac);
+    my ($blevel,$fw) = XiaomiFlowerSens_readBatFW($name,$mac);
 
 
     Log3 $name, 4, "Sub XiaomiFlowerSens_Run ($name) - Rückgabe an Auswertungsprogramm beginnt";
@@ -265,8 +265,8 @@ sub XiaomiFlowerSens_Run($) {
 
 sub XiaomiFlowerSens_gattCharRead($$) {
 
-    my ($mac,$wfr)       = @_;
-    my $hci              = ReadingsVal($name,"hciDevice","hci0")
+    my ($name,$mac,$wfr)       = @_;
+    my $hci              = ReadingsVal($name,"hciDevice","hci0");
     
     
     my $loop = 0;
@@ -298,8 +298,8 @@ sub XiaomiFlowerSens_gattCharRead($$) {
 
 sub XiaomiFlowerSens_readBatFW($) {
 
-    my ($mac)   = @_;
-    my $hci     = ReadingsVal($name,"hciDevice","hci0")
+    my ($name,$mac)   = @_;
+    my $hci     = ReadingsVal($name,"hciDevice","hci0");
     
     
     my $loop = 0;
