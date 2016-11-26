@@ -251,7 +251,7 @@ sub XiaomiFlowerSens_Run($) {
     return "$name|$response_encode";
 }
 
-sub XiaomiFlowerSens_gattCharRead($$) {
+sub XiaomiFlowerSens_gattCharRead($$$) {
 
     my ($name,$mac,$wfr)       = @_;
     my $hci              = ReadingsVal($name,"hciDevice","hci0");
@@ -284,7 +284,7 @@ sub XiaomiFlowerSens_gattCharRead($$) {
     return ($temp,$lux,$moisture,$fertility);
 }
 
-sub XiaomiFlowerSens_readBatFW($) {
+sub XiaomiFlowerSens_readBatFW($$) {
 
     my ($name,$mac)   = @_;
     my $hci     = ReadingsVal($name,"hciDevice","hci0");
