@@ -170,7 +170,7 @@ sub XiaomiFlowerSens_stateRequest($) {
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled") and !IsDisabled($name) );
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     XiaomiFlowerSens($hash) if( !IsDisabled($name) );
@@ -184,7 +184,7 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     RemoveInternalTimer($hash);
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled") and !IsDisabled($name) );
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
