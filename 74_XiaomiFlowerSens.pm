@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.3";
+my $version = "0.2.4";
 
 
 
@@ -76,7 +76,7 @@ sub XiaomiFlowerSens_Define($$) {
     
     $hash->{BTMAC} 	= $mac;
     $hash->{VERSION} 	= $version;
-    $hash->{INTERVAL}   = 3600;
+    $hash->{INTERVAL}   = 300;
         
     $modules{XiaomiFlowerSens}{defptr}{$hash->{BTMAC}} = $hash;
     readingsSingleUpdate ($hash,"state","initialized", 0);
@@ -123,12 +123,24 @@ sub XiaomiFlowerSens_Attr(@) {
     
     if( $attrName eq "disable" ) {
 	if( $cmd eq "set" and $attrVal eq "1" ) {
-	    
+	    readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - disabled";
 	}
 	
 	elsif( $cmd eq "del" ) {
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
+            Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
+        }
+    }
+    
+    if( $attrName eq "disabledForIntervals" ) {
+	if( $cmd eq "set" ) {
+            Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - disabledForIntervals";
+            readingsSingleUpdate ( $hash, "state", "Unknown", 1 );
+	}
 	
+	elsif( $cmd eq "del" ) {
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
         }
     }
@@ -145,7 +157,7 @@ sub XiaomiFlowerSens_Attr(@) {
 	}
 	
 	elsif( $cmd eq "del" ) {
-	    $hash->{INTERVAL} = 3600;
+	    $hash->{INTERVAL} = 300;
 	    Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - set interval to default";
         }
     }
@@ -158,7 +170,7 @@ sub XiaomiFlowerSens_stateRequest($) {
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" );
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     XiaomiFlowerSens($hash) if( !IsDisabled($name) );
@@ -171,7 +183,8 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     
     RemoveInternalTimer($hash);
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" );
+    
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
@@ -187,7 +200,7 @@ sub XiaomiFlowerSens_Set($$@) {
     my $action;
 
     if( $cmd eq 'statusRequest' ) {
-        XiaomiFlowerSens_stateRequest($hash) if( !IsDisabled($name) );
+        XiaomiFlowerSens_stateRequest($hash);
     
     } else {
         my $list = "statusRequest:noArg";
