@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.4";
+my $version = "0.2.6";
 
 
 
@@ -219,10 +219,10 @@ sub XiaomiFlowerSens($) {
     my $wfr;
     
     
-    if( ReadingsVal($name, "firmware", 0) eq "2.6.6" ) {
-        $wfr    = 1;
-    } else {
+    if( ReadingsVal($name, "firmware", 0) eq "2.6.2" ) {
         $wfr    = 0;
+    } else {
+        $wfr    = 1;
     }
 
     BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
@@ -287,9 +287,15 @@ sub XiaomiFlowerSens_gattCharRead($$$) {
     return (undef,undef,undef,undef)
     unless( defined($readData[0]) );
     
+    
     my @data            = split(" ",$readData[1]);
     
-    my $temp            = hex("0x".$data[1].$data[0]);
+    my $temp;
+    if( $data[1] eq "ff" ) {
+        $temp            = hex("0x".$data[1].$data[0]) - hex("0xffff");
+    } else {
+        $temp            = hex("0x".$data[1].$data[0]);
+    }
     my $lux             = hex("0x".$data[4].$data[3]);
     my $moisture        = hex("0x".$data[7]);
     my $fertility       = hex("0x".$data[9].$data[8]);
