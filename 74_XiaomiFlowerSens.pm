@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.6";
+my $version = "0.2.9";
 
 
 
@@ -170,7 +170,7 @@ sub XiaomiFlowerSens_stateRequest($) {
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     XiaomiFlowerSens($hash) if( !IsDisabled($name) );
@@ -184,7 +184,7 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     RemoveInternalTimer($hash);
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
+    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
     readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
@@ -251,7 +251,7 @@ sub XiaomiFlowerSens_Run($) {
     ##### Abruf des aktuellen Status
     my ($temp,$lux,$moisture,$fertility)  = XiaomiFlowerSens_gattCharRead($name,$mac,$wfr);
     
-    ###### Batteriestatus einlesen    
+    ###### Batteriestatus auslesen    
     my ($blevel,$fw) = XiaomiFlowerSens_readBatFW($name,$mac);
 
 
@@ -259,6 +259,9 @@ sub XiaomiFlowerSens_Run($) {
 
     return "$name|err"
     unless( defined($temp) and defined($blevel) );
+    
+    return "$name|corrupted data"
+    if( $temp == 0 and $lux == 0 and $moisture == 0 and $fertility == 0 );
     
     my $response_encode = XiaomiFlowerSens_forDone_encodeJSON($temp,$lux,$moisture,$fertility,$blevel,$fw);
     return "$name|$response_encode";
@@ -289,6 +292,9 @@ sub XiaomiFlowerSens_gattCharRead($$$) {
     
     
     my @data            = split(" ",$readData[1]);
+    
+    return (undef,undef,undef,undef)
+    unless( $data[0] ne "aa" and $data[1] ne "bb" and $data[2] ne "cc" and $data[3] ne "dd" and $data[4] ne "ee" and $data[5] ne "ff" );
     
     my $temp;
     if( $data[1] eq "ff" ) {
@@ -372,19 +378,23 @@ sub XiaomiFlowerSens_Done($) {
     if( $response eq "err" ) {
         readingsSingleUpdate($hash,"state","unreachable", 1);
         return undef;
+    } elsif( $response eq "corrupted data" ) {
+        readingsSingleUpdate($hash,"state","corrupted data", 1);
+        return undef;
     }
     
     
     my $response_json = decode_json($response);
     
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "battery", $response_json->{blevel});
+    readingsBulkUpdate($hash, "batteryLevel", $response_json->{blevel});
+    readingsBulkUpdate($hash, "battery", ($response_json->{blevel}>20?"ok":"low") );
     readingsBulkUpdate($hash, "temperature", $response_json->{temp}/10);
     readingsBulkUpdate($hash, "lux", $response_json->{lux});
     readingsBulkUpdate($hash, "moisture", $response_json->{moisture});
     readingsBulkUpdate($hash, "fertility", $response_json->{fertility});
     readingsBulkUpdate($hash, "firmware", $response_json->{firmware});
-    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" or ReadingsVal($name,"state", 0) eq "unreachable" );
+    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" or ReadingsVal($name,"state", 0) eq "unreachable" or ReadingsVal($name,"state", 0) eq "corrupted data" );
     readingsEndUpdate($hash,1);
     
     
