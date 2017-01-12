@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.2.9";
+my $version = "0.2.10";
 
 
 
@@ -122,25 +122,27 @@ sub XiaomiFlowerSens_Attr(@) {
     
     
     if( $attrName eq "disable" ) {
-	if( $cmd eq "set" and $attrVal eq "1" ) {
-	    readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+        if( $cmd eq "set" and $attrVal eq "1" ) {
+            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - disabled";
-	}
+        }
 	
-	elsif( $cmd eq "del" ) {
+        elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
+            InternalTimer( gettimeofday()+int(rand(30)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
         }
     }
     
     if( $attrName eq "disabledForIntervals" ) {
-	if( $cmd eq "set" ) {
+        if( $cmd eq "set" ) {
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - disabledForIntervals";
             readingsSingleUpdate ( $hash, "state", "Unknown", 1 );
-	}
+        }
 	
-	elsif( $cmd eq "del" ) {
+        elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
+            InternalTimer( gettimeofday()+int(rand(30)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
             Log3 $name, 3, "Sub XiaomiFlowerSens ($name) - enabled";
         }
     }
@@ -170,10 +172,17 @@ sub XiaomiFlowerSens_stateRequest($) {
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
-    readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
     
-    XiaomiFlowerSens($hash) if( !IsDisabled($name) );
+    if( !IsDisabled($name) ) {
+    
+        readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") );
+        
+        
+        XiaomiFlowerSens($hash);
+        
+    } else {
+        readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+    }
 }
 
 sub XiaomiFlowerSens_stateRequestTimer($) {
@@ -184,13 +193,20 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     RemoveInternalTimer($hash);
     
-    readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") and !IsDisabled($name) );
-    readingsSingleUpdate ( $hash, "state", "disabled", 1 ) if( IsDisabled($name) );
+    if( !IsDisabled($name) ) {
+    
+        readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") );
+        
+        
+        XiaomiFlowerSens($hash);
+        
+        InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
+        
+    } else {
+        readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+    }
     
     Log3 $name, 5, "Sub XiaomiFlowerSens ($name) - Request Timer wird aufgerufen";
-    XiaomiFlowerSens($hash) if( !IsDisabled($name) );
-    
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
 }
 
 sub XiaomiFlowerSens_Set($$@) {
@@ -432,15 +448,64 @@ sub XiaomiFlowerSens_Aborted($) {
 
 =pod
 =item device
-=item summary    
-=item summary_DE 
+=item summary       Modul to retrieves data from a Xiaomi Flower Monitor
+=item summary_DE    Modul um Daten vom Xiaomi Flower Monitor aus zu lesen
 
 =begin html
 
-=end html
+<a name="XiaomiFlowerSens"></a>
+<h3>Xiaomi Flower Monitor</h3>
+<ul>
+  <u><b>XiaomiFlowerSens - Retrieves data from a Xiaomi Flower Monitor</b></u>
+  <br>
+  With this module it is possible to read the data from a sensor and to set it as reading.</br>
+  Gatttool and hcitool is required to use this modul. (apt-get install bluez)
+  <br><br>
+  <a name="XiaomiFlowerSensdefine"></a>
+  <b>Define</b>
+  <ul><br>
+    <code>define &lt;name&gt; XiaomiFlowerSens &lt;BT-MAC&gt;</code>
+    <br><br>
+    Example:
+    <ul><br>
+      <code>define Weihnachtskaktus XiaomiFlowerSens C4:7C:8D:62:42:6F</code><br>
+    </ul>
+    <br>
+    This statement creates a XiaomiFlowerSens with the name Weihnachtskaktus and the Bluetooth Mac C4:7C:8D:62:42:6F.<br>
+    After the device has been created, the current data of the Xiaomi Flower Monitor is automatically read from the device.
+  </ul>
+  <br><br>
+  <a name="XiaomiFlowerSensreadings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>state - Status of the flower sensor or error message if any errors.</li>
+    <li>battery - current battery state dependent on batteryLevel.</li>
+    <li>batteryLevel - current battery level in percent.</li>
+    <li>fertility - Values for the fertilizer content</li>
+    <li>firmware - current device firmware</li>
+    <li>lux - current light intensity</li>
+    <li>moisture - current moisture content</li>
+    <li>temperature - current temperature</li>
+  </ul>
+  <br><br>
+  <a name="XiaomiFlowerSensset"></a>
+  <b>Set</b>
+  <ul>
+    <li>statusRequest - retrieves the current state of the Xiaomi Flower Monitor.</li>
+    <br>
+  </ul>
+  <br><br>
+  <a name="NUKIDeviceattribut"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>disable - disables the Nuki device</li>
+    <li>interval - interval in seconds for statusRequest</li>
+    <br>
+  </ul>
+</ul>
 
+=end html
 =begin html_DE
 
 =end html_DE
-
 =cut
