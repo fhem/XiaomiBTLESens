@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.0";
+my $version = "0.6.2";
 
 
 
@@ -63,15 +63,15 @@ sub XiaomiFlowerSens_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}	    = "XiaomiFlowerSens_Set";
-    $hash->{DefFn}	    = "XiaomiFlowerSens_Define";
-    $hash->{UndefFn}	= "XiaomiFlowerSens_Undef";
-    $hash->{AttrFn}	    = "XiaomiFlowerSens_Attr";
-    $hash->{AttrList} 	= "interval ".
-                          "disable:1 ".
-                          "hciDevice:hci0,hci1,hci2 ".
-                          "disabledForIntervals ".
-                           $readingFnAttributes;
+    $hash->{SetFn}      = "XiaomiFlowerSens_Set";
+    $hash->{DefFn}      = "XiaomiFlowerSens_Define";
+    $hash->{UndefFn}    = "XiaomiFlowerSens_Undef";
+    $hash->{AttrFn}     = "XiaomiFlowerSens_Attr";
+    $hash->{AttrList}   = "interval ".
+                            "disable:1 ".
+                            "hciDevice:hci0,hci1,hci2 ".
+                            "disabledForIntervals ".
+                            $readingFnAttributes;
 
 
 
@@ -89,10 +89,10 @@ sub XiaomiFlowerSens_Define($$) {
     return "too few parameters: define <name> XiaomiFlowerSens <BTMAC>" if( @a != 3 );
     
 
-    my $name    	= $a[0];
-    my $mac     	= $a[2];
+    my $name            = $a[0];
+    my $mac             = $a[2];
     
-    $hash->{BTMAC} 	= $mac;
+    $hash->{BTMAC}      = $mac;
     $hash->{VERSION} 	= $version;
     $hash->{INTERVAL}   = 300;
         
@@ -134,9 +134,9 @@ sub XiaomiFlowerSens_Undef($$) {
 sub XiaomiFlowerSens_Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $defs{$name};
+    my $hash                                = $defs{$name};
     
-    my $orig = $attrVal;
+    my $orig                                = $attrVal;
     
     
     if( $attrName eq "disable" ) {
@@ -227,8 +227,8 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
 
 sub XiaomiFlowerSens_Set($$@) {
     
-    my ($hash, $name, @aa) = @_;
-    my ($cmd, $arg) = @aa;
+    my ($hash, $name, @aa)  = @_;
+    my ($cmd, $arg)         = @aa;
     my $action;
 
     if( $cmd eq 'statusRequest' ) {
@@ -287,7 +287,7 @@ sub XiaomiFlowerSens_BlockingRun($) {
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Processing response data: $sensData";
 
-    return "$name|$sensData"     # if error in stdout the error will given to $lux variable
+    return "$name|chomp($sensData)"     # if error in stdout the error will given to $sensData variable
     unless( defined($batFwData) );
     
     
@@ -295,30 +295,30 @@ sub XiaomiFlowerSens_BlockingRun($) {
     
     #### processing sensor respons
     
-    my @dataSensor            = split(" ",$sensData);
+    my @dataSensor  = split(" ",$sensData);
     
     return "$name|charWrite faild"
     unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
     
     my $temp;
     if( $dataSensor[1] eq "ff" ) {
-        $temp            = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff");
+        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff");
     } else {
-        $temp            = hex("0x".$dataSensor[1].$dataSensor[0]);
+        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]);
     }
-    my $lux             = hex("0x".$dataSensor[4].$dataSensor[3]);
-    my $moisture        = hex("0x".$dataSensor[7]);
-    my $fertility       = hex("0x".$dataSensor[9].$dataSensor[8]);
+    my $lux         = hex("0x".$dataSensor[4].$dataSensor[3]);
+    my $moisture    = hex("0x".$dataSensor[7]);
+    my $fertility   = hex("0x".$dataSensor[9].$dataSensor[8]);
     
     
     
     
     ### processing firmware and battery response
     
-    my @dataBatFw            = split(" ",$batFwData);
+    my @dataBatFw   = split(" ",$batFwData);
     
-    my $blevel          = hex("0x".$dataBatFw[0]);
-    my $fw              = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
+    my $blevel      = hex("0x".$dataBatFw[0]);
+    my $fw          = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
 
     
     
@@ -359,7 +359,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     if($wfr == 1) {
         
         do {
-            $wresp       = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
+            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
             $loop++;
             
         } while( ($loop < 10) and (not defined($wresp)) );
@@ -384,7 +384,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     do {
     
-        @readBatFwData        = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
+        @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
         $loop++;
     
@@ -432,9 +432,9 @@ sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$) {
 
 sub XiaomiFlowerSens_BlockingDone($) {
 
-    my ($string) = @_;
-    my ($name,$response)       = split("\\|",$string);
-    my $hash    = $defs{$name};
+    my ($string)            = @_;
+    my ($name,$response)    = split("\\|",$string);
+    my $hash                = $defs{$name};
     
     
     delete($hash->{helper}{RUNNING_PID});
@@ -482,8 +482,8 @@ sub XiaomiFlowerSens_BlockingDone($) {
 
 sub XiaomiFlowerSens_BlockingAborted($) {
 
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
+    my ($hash)  = @_;
+    my $name    = $hash->{NAME};
 
     delete($hash->{helper}{RUNNING_PID});
     readingsSingleUpdate($hash,"state","unreachable", 1);
