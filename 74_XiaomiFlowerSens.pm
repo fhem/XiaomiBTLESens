@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.2";
+my $version = "0.6.3";
 
 
 
@@ -125,6 +125,7 @@ sub XiaomiFlowerSens_Undef($$) {
     
     
     RemoveInternalTimer($hash);
+    BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
     
     delete($modules{XiaomiFlowerSens}{defptr}{$mac});
     Log3 $name, 3, "Sub XiaomiFlowerSens_Undef ($name) - delete device $name";
@@ -257,7 +258,6 @@ sub XiaomiFlowerSens_Run($) {
         $wfr    = 1;
     }
 
-    BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
         
     my $response_encode = XiaomiFlowerSens_forRun_encodeJSON($mac,$wfr);
         
@@ -287,7 +287,8 @@ sub XiaomiFlowerSens_BlockingRun($) {
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Processing response data: $sensData";
 
-    return "$name|chomp($sensData)"     # if error in stdout the error will given to $sensData variable
+    
+    return "$name|Unknown Error, look at verbose 5 output"     # if error in stdout the error will given to $sensData variable
     unless( defined($batFwData) );
     
     
@@ -359,8 +360,10 @@ sub XiaomiFlowerSens_callGatttool($@) {
     if($wfr == 1) {
         
         do {
-            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F) if($wfr == 1);
+            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null) if($wfr == 1);
             $loop++;
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp));
             
         } while( ($loop < 10) and (not defined($wresp)) );
     }
@@ -369,11 +372,12 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     do {
         @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
-        Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
         $loop++;
+        Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
     
     } while( $loop < 10 and $readSensData[0] =~ /connect error/ );
     
+    Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData[0]: $readSensData[0]";
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData: $readSensData[1]";
     
     return ($readSensData[1],undef)
@@ -454,6 +458,13 @@ sub XiaomiFlowerSens_BlockingDone($) {
         readingsBulkUpdate($hash,"state","charWrite faild");
         readingsEndUpdate($hash,1);
         return undef;
+        
+    } elsif( $response eq "Unknown Error, look at verbose 5 output" ) {
+        
+        readingsBulkUpdate($hash,"lastGattError","$response");
+        readingsBulkUpdate($hash,"state","unreachable");
+        readingsEndUpdate($hash,1);
+        return undef;    
         
     } elsif( ref($response) eq "HASH" ) {
         readingsBulkUpdate($hash,"lastGattError","$response");
