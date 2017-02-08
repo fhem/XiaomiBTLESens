@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.4";
+my $version = "0.6.5";
 
 
 
@@ -386,7 +386,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData: $readSensData[1]";
     
     return ($readSensData[1],undef)
-    unless( $readSensData[0] =~ /Characteristic value/ );
+    unless( $readSensData[0] !=~ /Characteristic value/ );
     
     
     ### Read Firmware and Battery Data
@@ -402,7 +402,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. batFwData: $readBatFwData[1]";
     
     return ($readBatFwData[1],undef)
-    unless( $readBatFwData[0] =~ /Characteristic value/ );
+    unless( $readBatFwData[0] !=~ /Characteristic value/ );
     
     
     
