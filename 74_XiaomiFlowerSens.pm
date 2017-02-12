@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.6.6";
+my $version = "0.6.8";
 
 
 
@@ -338,7 +338,7 @@ sub XiaomiFlowerSens_BlockingRun($) {
 sub XiaomiFlowerSens_callGatttool($@) {
 
     my ($name,$mac,$wfr)    = @_;
-    my $hci                 = ReadingsVal($name,"hciDevice","hci0");
+    my $hci                 = AttrVal($name,"hciDevice","hci0");
     
     my $loop;
     my $wresp;
@@ -368,7 +368,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp));
             
-        } while( ($loop < 10) and (not defined($wresp)) );
+        } while( ($loop < 10) and (not $wresp =~ /^Characteristic value was written successfully$/) );
     }
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - run gatttool";
