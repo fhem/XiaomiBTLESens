@@ -229,14 +229,21 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
 sub XiaomiFlowerSens_Set($$@) {
     
     my ($hash, $name, @aa)  = @_;
-    my ($cmd, $arg)         = @aa;
-    my $action;
+    my ($cmd, @args)         = @aa;
+    
 
     if( $cmd eq 'statusRequest' ) {
+        return "usage: statusRequest" if( @args != 0 );
+    
         XiaomiFlowerSens_stateRequest($hash);
+        
+    } elsif( $cmd eq 'clearFirmwareReading' ) {
+        return "usage: clearFirmwareReading" if( @args != 0 );
+    
+        readingsSingleUpdate($hash,'firmware','',0);
     
     } else {
-        my $list = "statusRequest:noArg";
+        my $list = "statusRequest:noArg clearFirmwareReading:noArg";
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -252,13 +259,13 @@ sub XiaomiFlowerSens_Run($) {
     my $wfr;
     
     
-    if( ReadingsVal($name, "firmware", 0) eq "2.6.2" ) {
+    if( ReadingsVal($name, 'firmware', '') eq "2.6.2" ) {
         $wfr    = 0;
     } else {
         $wfr    = 1;
     }
 
-        
+
     my $response_encode = XiaomiFlowerSens_forRun_encodeJSON($mac,$wfr);
         
     $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_BlockingRun", $name."|".$response_encode, "XiaomiFlowerSens_BlockingDone", 30, "XiaomiFlowerSens_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
@@ -358,15 +365,16 @@ sub XiaomiFlowerSens_callGatttool($@) {
     #### Read Sensor Data
     
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
+    Log3 $name, 5, "Sub XiaomiFlowerSens_callGatttool ($name) - WFR: $wfr";
     if($wfr == 1) {
         
         $loop = 0;
         do {
         
-            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null) if($wfr == 1);
+            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null);
             $loop++;
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp));
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp) and ($wresp) );
             
         } while( ($loop < 10) and (not $wresp =~ /^Characteristic value was written successfully$/) );
     }
@@ -571,6 +579,7 @@ sub XiaomiFlowerSens_BlockingAborted($) {
   <b>Set</b>
   <ul>
     <li>statusRequest - retrieves the current state of the Xiaomi Flower Monitor.</li>
+    <li>clearFirmwareReading - clear firmware reading for new begin.</li>
     <br>
   </ul>
   <br><br>
