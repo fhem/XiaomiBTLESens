@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.9.9";
+my $version = "0.9.11";
 
 
 
@@ -72,9 +72,12 @@ sub XiaomiFlowerSens_Initialize($) {
                             "disabledForIntervals ".
                             "hciDevice:hci0,hci1,hci2 ".
                             "minFertility ".
+                            "maxFertility ".
                             "minTemp ".
                             "maxTemp ".
                             "minMoisture ".
+                            "maxMoisture ".
+                            "sshHost ".
                             $readingFnAttributes;
 
 
@@ -351,15 +354,29 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     my $loop;
     my $wresp;
+    my $sshHost             = AttrVal($name,"sshHost","none");
     my @readSensData;
     my @readBatFwData;
     
     
     $loop = 0;
-    while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
-        Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
-        sleep 0.5;
-        $loop++;
+    
+    if( $sshHost ne 'none') {
+    
+        while ( (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop = 0) or (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop < 5) ) {
+        
+            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
+            sleep 0.5;
+            $loop++;
+        }
+    } else {
+    
+        while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
+        
+            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
+            sleep 0.5;
+            $loop++;
+        }
     }
     
     
@@ -373,7 +390,15 @@ sub XiaomiFlowerSens_callGatttool($@) {
         $loop = 0;
         do {
         
-            $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null);
+            if( $sshHost ne 'none' ) {
+            
+                $wresp      = qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null');
+                
+            } else {
+            
+                $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null);
+            }
+            
             $loop++;
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp) and ($wresp) );
@@ -386,7 +411,15 @@ sub XiaomiFlowerSens_callGatttool($@) {
     $loop = 0;
     do {
     
-        @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
+        if( $sshHost ne 'none' ) {
+        
+            @readSensData   = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'));
+            
+        } else {
+        
+            @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
+        }
+            
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
     
@@ -403,7 +436,15 @@ sub XiaomiFlowerSens_callGatttool($@) {
     $loop = 0;
     do {
     
-        @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
+        if( $sshHost ne 'none' ) {
+        
+            @readBatFwData  = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null'));
+        
+        } else {
+        
+            @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
+        }
+        
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
     
@@ -504,9 +545,13 @@ sub XiaomiFlowerSens_BlockingDone($) {
 
 
     DoTrigger($name, 'minFertility ' . ($response_json->{fertility}<AttrVal($name,'minFertility',0)?'low':'ok')) if( AttrVal($name,'minFertility','none') ne 'none' );
+    DoTrigger($name, 'maxFertility ' . ($response_json->{fertility}>AttrVal($name,'maxFertility',0)?'high':'ok')) if( AttrVal($name,'maxFertility','none') ne 'none' );
+    
     DoTrigger($name, 'minTemp ' . ($response_json->{temp}/10<AttrVal($name,'minTemp',0)?'low':'ok')) if( AttrVal($name,'minTemp','none') ne 'none' );
     DoTrigger($name, 'maxTemp ' . ($response_json->{temp}/10>AttrVal($name,'maxTemp',0)?'high':'ok')) if( AttrVal($name,'maxTemp','none') ne 'none' );
+    
     DoTrigger($name, 'minMoisture ' . ($response_json->{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
+    DoTrigger($name, 'maxMoisture ' . ($response_json->{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
 
 
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingDone ($name) - Abschluss!";
@@ -597,12 +642,15 @@ sub XiaomiFlowerSens_BlockingAborted($) {
     <li>disable - disables the Nuki device</li>
     <li>interval - interval in seconds for statusRequest</li>
     <li>minFertility - min fertility value befor low warn event</li>
+    <li>maxFertility - max fertility value befor High warn event</li>
     <li>minMoisture - min moisture value befor low warn event</li>
+    <li>maxMoisture - max moisture value befor High warn event</li>
     <li>minTemp - min temperature value befor low warn event</li>
-    <li>maxTemp - max temperature value befor high warn event</li>
+    <li>maxTemp - max temperature value befor high warn event
     <br>
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
-    Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high
+    Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
+    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication</li>
   </ul>
 </ul>
 
