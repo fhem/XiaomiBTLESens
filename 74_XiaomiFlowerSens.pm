@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.9.11";
+my $version = "0.9.18";
 
 
 
@@ -365,7 +365,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
         while ( (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop = 0) or (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop < 5) ) {
         
-            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
+            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running at host $sshHost. loop: $loop";
             sleep 0.5;
             $loop++;
         }
@@ -373,7 +373,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
         while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         
-            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running. loop: $loop";
+            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running at local host. loop: $loop";
             sleep 0.5;
             $loop++;
         }
@@ -393,10 +393,12 @@ sub XiaomiFlowerSens_callGatttool($@) {
             if( $sshHost ne 'none' ) {
             
                 $wresp      = qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null');
+                Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - write data to host $sshHost";
                 
             } else {
             
                 $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null);
+                Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - write data to local host";
             }
             
             $loop++;
@@ -414,10 +416,12 @@ sub XiaomiFlowerSens_callGatttool($@) {
         if( $sshHost ne 'none' ) {
         
             @readSensData   = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'));
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from host $sshHost";
             
         } else {
         
             @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from local host";
         }
             
         $loop++;
@@ -439,10 +443,12 @@ sub XiaomiFlowerSens_callGatttool($@) {
         if( $sshHost ne 'none' ) {
         
             @readBatFwData  = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null'));
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call firm/batt data from host $sshHost";
         
         } else {
         
             @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call firm/batt data from host local host";
         }
         
         $loop++;
