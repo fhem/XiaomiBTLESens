@@ -35,7 +35,7 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.9.18";
+my $version = "1.0.0";
 
 
 
@@ -656,7 +656,7 @@ sub XiaomiFlowerSens_BlockingAborted($) {
     <br>
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
-    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication</li>
+    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client wirh .ssh/config file</li>
   </ul>
 </ul>
 
