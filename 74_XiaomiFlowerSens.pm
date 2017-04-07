@@ -35,7 +35,8 @@ use POSIX;
 use JSON;
 use Blocking;
 
-my $version = "0.9.18";
+
+my $version = "1.1.0";
 
 
 
@@ -50,9 +51,9 @@ sub XiaomiFlowerSens_stateRequestTimer($);
 sub XiaomiFlowerSens_Set($$@);
 sub XiaomiFlowerSens_Run($);
 sub XiaomiFlowerSens_BlockingRun($);
-sub XiaomiFlowerSens_callGatttool($@);
-sub XiaomiFlowerSens_forRun_encodeJSON($$);
-sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$);
+sub XiaomiFlowerSens_gattSensorData($);
+sub XiaomiFlowerSens_gattBatFwData($);
+sub XiaomiFlowerSens_forDone_encodeJSON(@);
 sub XiaomiFlowerSens_BlockingDone($);
 sub XiaomiFlowerSens_BlockingAborted($);
 
@@ -77,14 +78,16 @@ sub XiaomiFlowerSens_Initialize($) {
                             "maxTemp ".
                             "minMoisture ".
                             "maxMoisture ".
+                            "minLux ".
+                            "maxLux ".
                             "sshHost ".
                             $readingFnAttributes;
 
 
 
     foreach my $d(sort keys %{$modules{XiaomiFlowerSens}{defptr}}) {
-	my $hash = $modules{XiaomiFlowerSens}{defptr}{$d};
-	$hash->{VERSION} 	= $version;
+        my $hash = $modules{XiaomiFlowerSens}{defptr}{$d};
+        $hash->{VERSION} 	= $version;
     }
 }
 
@@ -257,36 +260,34 @@ sub XiaomiFlowerSens_Set($$@) {
 
 sub XiaomiFlowerSens_Run($) {
 
-    my ( $hash, $cmd ) = @_;
+    my $hash = shift;
     
     my $name    = $hash->{NAME};
-    my $mac     = $hash->{BTMAC};
-    my $wfr;
     
-    
-    if( ReadingsVal($name, 'firmware', '') eq "2.6.2" ) {
-        $wfr    = 0;
-    } else {
-        $wfr    = 1;
-    }
 
-
-    my $response_encode = XiaomiFlowerSens_forRun_encodeJSON($mac,$wfr);
-        
-    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_BlockingRun", $name."|".$response_encode, "XiaomiFlowerSens_BlockingDone", 30, "XiaomiFlowerSens_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_BlockingRun", $name, "XiaomiFlowerSens_BlockingDone", 30, "XiaomiFlowerSens_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     Log3 $name, 4, "Sub XiaomiFlowerSens_Run ($name) - start blocking call";
     
-    readingsSingleUpdate ( $hash, "state", "call data", 1 ) if( ReadingsVal($name, "state", 0) eq "active" );
+    readingsSingleUpdate ( $hash, "state", "read data", 1 ) if( ReadingsVal($name, "state", 0) eq "active" );
 }
 
 sub XiaomiFlowerSens_BlockingRun($) {
 
-    my ($string)        = @_;
-    my ($name,$data)    = split("\\|", $string);
-    my $data_json       = decode_json($data);
+    my $name            = shift;
     
-    my $mac             = $data_json->{mac};
-    my $wfr             = $data_json->{wfr};
+    my $hci                 = AttrVal($name,"hciDevice","hci0");
+    my $sshHost             = AttrVal($name,"sshHost","none");
+    my $mac                 = $hash->{BTMAC};
+    my $wresp;
+    my @readSensData;
+    my @readBatFwData;
+    
+    my $wfr;
+        if( ReadingsVal($name, 'firmware', '') eq "2.6.2" ) {
+            $wfr    = 0;
+        } else {
+            $wfr    = 1;
+        }
     
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Running nonBlocking";
@@ -294,7 +295,7 @@ sub XiaomiFlowerSens_BlockingRun($) {
     
     ##### call sensor data
     
-    my ($sensData,$batFwData)  = XiaomiFlowerSens_callGatttool($name,$mac,$wfr);
+    my ($sensData,$batFwData)  = XiaomiFlowerSens_callGatttool($name);
     
     
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Processing response data: $sensData";
@@ -347,18 +348,14 @@ sub XiaomiFlowerSens_BlockingRun($) {
     return "$name|$response_encode";
 }
 
-sub XiaomiFlowerSens_callGatttool($@) {
+sub XiaomiFlowerSens_gattSensorData($) {
 
-    my ($name,$mac,$wfr)    = @_;
-    my $hci                 = AttrVal($name,"hciDevice","hci0");
+    my $name                = shift;
     
     my $loop;
     my $wresp;
-    my $sshHost             = AttrVal($name,"sshHost","none");
-    my @readSensData;
-    my @readBatFwData;
-    
-    
+
+
     $loop = 0;
     
     if( $sshHost ne 'none') {
@@ -378,9 +375,8 @@ sub XiaomiFlowerSens_callGatttool($@) {
             $loop++;
         }
     }
-    
-    
-    
+
+
     #### Read Sensor Data
     
     ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
@@ -389,7 +385,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
         
         $loop = 0;
         do {
-        
+
             if( $sshHost ne 'none' ) {
             
                 $wresp      = qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null');
@@ -412,18 +408,18 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     $loop = 0;
     do {
-    
+
         if( $sshHost ne 'none' ) {
         
             @readSensData   = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from host $sshHost";
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - read data from host $sshHost";
             
         } else {
         
             @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from local host";
+            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - read data from local host";
         }
-            
+
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
     
@@ -434,12 +430,22 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     return ($readSensData[1],undef)
     unless( $readSensData[0] =~ /^Characteristic value\/descriptor$/ );
+
     
-    
+    ### no Error in data string
+    return $readSensData[1];
+}
+
+sub XiaomiFlowerSens_gattBatFwData($) {
+
+    my $name        = shift;
+    my $loop;
+
+
     ### Read Firmware and Battery Data
     $loop = 0;
     do {
-    
+
         if( $sshHost ne 'none' ) {
         
             @readBatFwData  = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null'));
@@ -450,7 +456,7 @@ sub XiaomiFlowerSens_callGatttool($@) {
             @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
             Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call firm/batt data from host local host";
         }
-        
+
         $loop++;
         Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
     
@@ -460,27 +466,13 @@ sub XiaomiFlowerSens_callGatttool($@) {
     
     return ($readBatFwData[1],undef)
     unless( $readBatFwData[0] =~ /^Characteristic value\/descriptor$/ );
-    
-    
-    
+
     
     ### no Error in data string
-    return ($readSensData[1],$readBatFwData[1])
+    return $readBatFwData[1];
 }
 
-sub XiaomiFlowerSens_forRun_encodeJSON($$) {
-
-    my ($mac,$wfr) = @_;
-
-    my %data = (
-        'mac'           => $mac,
-        'wfr'           => $wfr
-    );
-    
-    return encode_json \%data;
-}
-
-sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$) {
+sub XiaomiFlowerSens_forDone_encodeJSON(@) {
 
     my ($temp,$lux,$moisture,$fertility,$blevel,$fw)        = @_;
 
@@ -545,7 +537,7 @@ sub XiaomiFlowerSens_BlockingDone($) {
     readingsBulkUpdate($hash, "moisture", $response_json->{moisture});
     readingsBulkUpdate($hash, "fertility", $response_json->{fertility});
     readingsBulkUpdate($hash, "firmware", $response_json->{firmware});
-    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" or ReadingsVal($name,"state", 0) eq "unreachable" or ReadingsVal($name,"state", 0) eq "corrupted data" );
+    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "read data" or ReadingsVal($name,"state", 0) eq "unreachable" or ReadingsVal($name,"state", 0) eq "corrupted data" );
 
     readingsEndUpdate($hash,1);
 
@@ -558,6 +550,9 @@ sub XiaomiFlowerSens_BlockingDone($) {
     
     DoTrigger($name, 'minMoisture ' . ($response_json->{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
     DoTrigger($name, 'maxMoisture ' . ($response_json->{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
+    
+    DoTrigger($name, 'minLux ' . ($response_json->{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
+    DoTrigger($name, 'maxLux ' . ($response_json->{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
 
 
     Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingDone ($name) - Abschluss!";
@@ -645,24 +640,89 @@ sub XiaomiFlowerSens_BlockingAborted($) {
   <a name="XiaomiFlowerSensattribut"></a>
   <b>Attributes</b>
   <ul>
-    <li>disable - disables the Nuki device</li>
+    <li>disable - disables the device</li>
     <li>interval - interval in seconds for statusRequest</li>
-    <li>minFertility - min fertility value befor low warn event</li>
-    <li>maxFertility - max fertility value befor High warn event</li>
-    <li>minMoisture - min moisture value befor low warn event</li>
-    <li>maxMoisture - max moisture value befor High warn event</li>
-    <li>minTemp - min temperature value befor low warn event</li>
-    <li>maxTemp - max temperature value befor high warn event
+    <li>minFertility - min fertility value for low warn event</li>
+    <li>maxFertility - max fertility value for High warn event</li>
+    <li>minMoisture - min moisture value for low warn event</li>
+    <li>maxMoisture - max moisture value for High warn event</li>
+    <li>minTemp - min temperature value for low warn event</li>
+    <li>maxTemp - max temperature value for high warn event</li>
+    <li>minlux - min lux value for low warn event</li>
+    <li>maxlux - max lux value for high warn event
     <br>
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
-    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication</li>
+    <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client with .ssh/config file</li>
   </ul>
 </ul>
 
 =end html
 
 =begin html_DE
+
+<a name="XiaomiFlowerSens"></a>
+<h3>Xiaomi Flower Monitor</h3>
+<ul>
+  <u><b>XiaomiFlowerSens - liest Daten von einem Xiaomi Flower Monitor</b></u>
+  <br />
+  Dieser Modul liest Daten von einem Sensor und legt sie in den Readings ab.<br />
+  Auf dem (Linux) FHEM-Server werden gatttool und hcitool vorausgesetzt. (sudo apt install bluez)
+  <br /><br />
+  <a name="XiaomiFlowerSensdefine"></a>
+  <b>Define</b>
+  <ul><br />
+    <code>define &lt;name&gt; XiaomiFlowerSens &lt;BT-MAC&gt;</code>
+    <br /><br />
+    Beispiel:
+    <ul><br />
+      <code>define Weihnachtskaktus XiaomiFlowerSens C4:7C:8D:62:42:6F</code><br />
+    </ul>
+    <br />
+	Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
+	Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensreadings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>state - Status des Flower Monitor oder eine Fehlermeldung falls Fehler beim letzten Kontakt auftraten.</li>
+    <li>battery - aktueller Batterie-Status in Abhängigkeit vom Wert batteryLevel.</li>
+    <li>batteryLevel - aktueller Ladestand der Batterie in Prozent.</li>
+    <li>fertility - Wert des Fruchtbarkeitssensors (Bodenleitf&auml;higkeit)</li>
+    <li>firmware - aktuelle Firmware-Version des Flower Monitor</li>
+    <li>lux - aktuelle Lichtintensit&auml;t</li>
+    <li>moisture - aktueller Feuchtigkeitswert</li>
+    <li>temperature - aktuelle Temperatur</li>
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensset"></a>
+  <b>Set</b>
+  <ul>
+    <li>statusRequest - aktive Abfrage des aktuellen Status des Xiaomi Flower Monitor und seiner Werte</li>
+    <li>clearFirmwareReading - l&ouml;scht das Reading firmware f&uuml;r/nach Upgrade</li>
+    <br />
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensattribut"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>disable - deaktiviert das Device</li>
+    <li>interval - Interval in Sekunden zwischen zwei Abfragen</li>
+    <li>minFertility - min Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis minFertility low </li>
+    <li>maxFertility - max Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis maxFertility high </li>
+    <li>minMoisture - min Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis minMoisture low </li> 
+    <li>maxMoisture - max Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis maxMoisture high </li>
+    <li>minTemp - min Temperatur-Grenzwert f&uuml;r ein Ereignis minTemp low </li>
+    <li>maxTemp - max Temperatur-Grenzwert f&uuml;r ein Ereignis maxTemp high </li>
+    <li>minlux - min Helligkeits-Grenzwert f&uuml;r ein Ereignis minlux low </li>
+    <li>maxlux - max Helligkeits-Grenzwert f&uuml;r ein Ereignis maxlux high
+    <br /><br />Beispiele f&uuml;r min/max-Ereignisse:<br />
+    2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br />
+    2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high<br /><br /></li>
+    <li>sshHost - FQDN oder IP-Adresse eines entfernten SSH-Systems. Das SSH-System ist auf eine Zertifikat basierte Authentifizierung zu konfigurieren. Am elegantesten geschieht das mit einer  .ssh/config Datei auf dem SSH-Client.</li>
+  </ul>
+</ul>
 
 =end html_DE
 
