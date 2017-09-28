@@ -36,7 +36,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.0.2";
+my $version = "1.0.3";
 
 
 
@@ -164,6 +164,8 @@ sub XiaomiFlowerSens_Attr(@) {
     
     if( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
+            return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+            unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "XiaomiFlowerSens ($name) - disabledForIntervals";
             readingsSingleUpdate ( $hash, "state", "Unknown", 1 );
         }
