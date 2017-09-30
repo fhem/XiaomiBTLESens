@@ -26,6 +26,16 @@
 ###############################################################################
 
 
+
+#$cmd = "qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F";
+#$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x35";   # Sensor Daten
+#$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x38";   # Firmware und Batterie
+        
+        
+        
+        
+
+
 package main;
 
 use strict;
@@ -36,7 +46,8 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.0";
+my $version = "1.1.39";
+my %readings = ();
 
 
 
@@ -49,13 +60,17 @@ sub XiaomiFlowerSens_Attr(@);
 sub XiaomiFlowerSens_stateRequest($);
 sub XiaomiFlowerSens_stateRequestTimer($);
 sub XiaomiFlowerSens_Set($$@);
-sub XiaomiFlowerSens_Run($);
-sub XiaomiFlowerSens_BlockingRun($);
-sub XiaomiFlowerSens_callGatttool($@);
-sub XiaomiFlowerSens_forRun_encodeJSON($$);
-sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$);
-sub XiaomiFlowerSens_BlockingDone($);
-sub XiaomiFlowerSens_BlockingAborted($);
+sub XiaomiFlowerSens_CallBatteryFirmware($);
+sub XiaomiFlowerSens_CallSensData($);
+sub XiaomiFlowerSens_WriteSensData($);
+sub XiaomiFlowerSens_ExecGatttool_Run($);
+sub XiaomiFlowerSens_ExecGatttool_Done($);
+sub XiaomiFlowerSens_ExecGatttool_Aborted($);
+sub XiaomiFlowerSens_ProcessingNotification($@);
+sub XiaomiFlowerSens_WriteReadings($);
+sub XiaomiFlowerSens_ProcessingErrors($$);
+
+
 
 
 
@@ -106,8 +121,8 @@ sub XiaomiFlowerSens_Define($$) {
     $hash->{VERSION} 	= $version;
     $hash->{INTERVAL}   = 300;
         
-    $modules{XiaomiFlowerSens}{defptr}{$hash->{BTMAC}} = $hash;
-    readingsSingleUpdate ($hash,"state","initialized", 0);
+    
+    readingsSingleUpdate($hash,"state","initialized", 0);
     $attr{$name}{room}          = "FlowerSens" if( !defined($attr{$name}{room}) );
     
     
@@ -146,16 +161,14 @@ sub XiaomiFlowerSens_Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash                                = $defs{$name};
-    
-    my $orig                                = $attrVal;
-    
-    
+
+
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
             readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - disabled";
         }
-	
+
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - enabled";
@@ -177,19 +190,21 @@ sub XiaomiFlowerSens_Attr(@) {
     }
     
     if( $attrName eq "interval" ) {
-	if( $cmd eq "set" ) {
-	    if( $attrVal < 300 ) {
-		Log3 $name, 3, "XiaomiFlowerSens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
-		return "interval too small, please use something >= 300 (sec), default is 3600 (sec)";
-	    } else {
-		$hash->{INTERVAL} = $attrVal;
-		Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to $attrVal";
-	    }
-	}
-	
-	elsif( $cmd eq "del" ) {
-	    $hash->{INTERVAL} = 300;
-	    Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
+        if( $cmd eq "set" ) {
+            if( $attrVal < 300 ) {
+                Log3 $name, 3, "XiaomiFlowerSens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
+                return "interval too small, please use something >= 300 (sec), default is 3600 (sec)";
+            } else {
+                $hash->{INTERVAL} = $attrVal;
+                Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to $attrVal";
+                XiaomiFlowerSens_stateRequestTimer($hash) if($init_done);
+            }
+        }
+
+        elsif( $cmd eq "del" ) {
+            $hash->{INTERVAL} = 300;
+            Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
+            XiaomiFlowerSens_stateRequestTimer($hash) if($init_done);
         }
     }
     
@@ -203,29 +218,42 @@ sub XiaomiFlowerSens_stateRequest($) {
     
     
     if( !IsDisabled($name) ) {
-    
-        readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown" or ReadingsVal($name, "state", 0) eq "charWrite faild") );
+        if( ReadingsVal($name,'firmware','none') ne 'none') {
+            if( ReadingsVal($name, 'firmware', '') eq '2.6.2') {
+            
+                XiaomiFlowerSens_CallSensData($hash);
+                
+            } else {
+            
+                XiaomiFlowerSens_WriteSensData($hash);
+            }
+            
+        } else {
         
+            XiaomiFlowerSens_CallBatteryFirmware($hash);
+        }
         
-        XiaomiFlowerSens_Run($hash);
-        
+        readingsSingleUpdate($hash,"state","fetch sensor data",1);
     } else {
-        readingsSingleUpdate ( $hash, "state", "disabled", 1 );
+        readingsSingleUpdate($hash,"state","disabled",1);
     }
 }
 
 sub XiaomiFlowerSens_stateRequestTimer($) {
 
     my ($hash)      = @_;
+    
     my $name        = $hash->{NAME};
     
     
-    if( !IsDisabled($name) ) {
+    RemoveInternalTimer($hash);
     
-        readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "corrupted data" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown" or ReadingsVal($name, "state", 0) eq "charWrite faild") );
+    if( not IsDisabled($name) ) {
+    
+        #readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") );
         
         
-        XiaomiFlowerSens_Run($hash);
+        XiaomiFlowerSens_stateRequest($hash);
         
     } else {
         readingsSingleUpdate ( $hash, "state", "disabled", 1 );
@@ -233,7 +261,46 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiFlowerSens_stateRequestTimer", $hash, 1 );
     
-    Log3 $name, 5, "Sub XiaomiFlowerSens_stateRequestTimer ($name) - Request Timer wird aufgerufen";
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - stateRequestTimer: Call Request Timer";
+}
+
+sub XiaomiFlowerSens_CallBatteryFirmware($) {
+
+    my $hash        = shift;
+    
+    my $name        = $hash->{NAME};
+    my $mac         = $hash->{BTMAC};
+
+    
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_ExecGatttool_Run", $name."|".$mac."|read|0x38", "XiaomiFlowerSens_ExecGatttool_Done", 60, "XiaomiFlowerSens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - CallBatteryFirmware: call function ExecGatttool_Run";
+}
+
+sub XiaomiFlowerSens_CallSensData($) {
+
+    my $hash        = shift;
+    
+    my $name        = $hash->{NAME};
+    my $mac         = $hash->{BTMAC};
+
+    
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_ExecGatttool_Run", $name."|".$mac."|read|0x35", "XiaomiFlowerSens_ExecGatttool_Done", 60, "XiaomiFlowerSens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - CallSensData: call function ExecGatttool_Run";
+}
+
+sub XiaomiFlowerSens_WriteSensData($) {
+
+    my $hash        = shift;
+    
+    my $name        = $hash->{NAME};
+    my $mac         = $hash->{BTMAC};
+
+
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_ExecGatttool_Run", $name."|".$mac."|write|0x33|A01F", "XiaomiFlowerSens_ExecGatttool_Done", 60, "XiaomiFlowerSens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - WriteSensData: call function ExecGatttool_Run";
 }
 
 sub XiaomiFlowerSens_Set($$@) {
@@ -260,332 +327,259 @@ sub XiaomiFlowerSens_Set($$@) {
     return undef;
 }
 
-sub XiaomiFlowerSens_Run($) {
+sub XiaomiFlowerSens_ExecGatttool_Run($) {
 
-    my ( $hash, $cmd ) = @_;
+    my $string      = shift;
     
-    my $name    = $hash->{NAME};
-    my $mac     = $hash->{BTMAC};
-    my $wfr;
-    
-    
-    if( ReadingsVal($name, 'firmware', '') eq "2.6.2" ) {
-        $wfr    = 0;
-    } else {
-        $wfr    = 1;
-    }
+    my ($name,$mac,$gattCmd,$handle,$value) = split("\\|", $string);
+    my $sshHost                             = AttrVal($name,"sshHost","none");
 
 
-    my $response_encode = XiaomiFlowerSens_forRun_encodeJSON($mac,$wfr);
+    my $gatttool                            = qx(which gatttool);
+    chomp $gatttool;
+    
+    if(-x $gatttool) {
+    
+        my $cmd;
+        my $loop;
+        my @gtResult;
+        my $wait    = 1;
+        my $sshHost = AttrVal($name,"sshHost","none");
+        my $hci     = AttrVal($name,"hciDevice","hci0");
         
-    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiFlowerSens_BlockingRun", $name."|".$response_encode, "XiaomiFlowerSens_BlockingDone", 30, "XiaomiFlowerSens_BlockingAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
-    Log3 $name, 4, "Sub XiaomiFlowerSens_Run ($name) - start blocking call";
-    
-    readingsSingleUpdate ( $hash, "state", "call data", 1 ) if( ReadingsVal($name, "state", 0) eq "active" );
-}
-
-sub XiaomiFlowerSens_BlockingRun($) {
-
-    my ($string)        = @_;
-    my ($name,$data)    = split("\\|", $string);
-    my $data_json       = decode_json($data);
-    
-    my $mac             = $data_json->{mac};
-    my $wfr             = $data_json->{wfr};
-    
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Running nonBlocking";
-    
-    
-    ##### call sensor data
-    
-    my ($sensData,$batFwData)  = XiaomiFlowerSens_callGatttool($name,$mac,$wfr);
-    
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - Processing response data: $sensData";
-
-    
-    return "$name|Unknown Error, look at verbose 5 output"     # if error in stdout the error will given to $sensData variable
-    unless( defined($batFwData) );
-    
-    
-    
-    
-    #### processing sensor respons
-    
-    my @dataSensor  = split(" ",$sensData);
-    
-    return "$name|charWrite faild"
-    unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
-    
-    my $temp;
-    if( $dataSensor[1] eq "ff" ) {
-        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff");
-    } else {
-        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]);
-    }
-    my $lux         = hex("0x".$dataSensor[4].$dataSensor[3]);
-    my $moisture    = hex("0x".$dataSensor[7]);
-    my $fertility   = hex("0x".$dataSensor[9].$dataSensor[8]);
-    
-    
-    
-    
-    ### processing firmware and battery response
-    
-    my @dataBatFw   = split(" ",$batFwData);
-    
-    my $blevel      = hex("0x".$dataBatFw[0]);
-    my $fw          = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
-
-    
-    
-    
-    ###### return processing data
-    return "$name|corrupted data"
-    if( $temp == 0 and $lux == 0 and $moisture == 0 and $fertility == 0 );
-    
-    my $response_encode = XiaomiFlowerSens_forDone_encodeJSON($temp,$lux,$moisture,$fertility,$blevel,$fw);
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingRun ($name) - no dataerror, create encode json: $response_encode";
-    
-    return "$name|$response_encode";
-}
-
-sub XiaomiFlowerSens_callGatttool($@) {
-
-    my ($name,$mac,$wfr)    = @_;
-    my $hci                 = AttrVal($name,"hciDevice","hci0");
-    
-    my $loop;
-    my $wresp;
-    my $sshHost             = AttrVal($name,"sshHost","none");
-    my @readSensData;
-    my @readBatFwData;
-    
-    
-    $loop = 0;
-    
-    if( $sshHost ne 'none') {
-    
-        while ( (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop = 0) or (qx(ssh $sshHost 'ps ax | grep -v grep | grep "gatttool -b $mac"') and $loop < 5) ) {
+        while($wait) {
         
-            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running at host $sshHost. loop: $loop";
-            sleep 0.5;
-            $loop++;
+            my $grepGatttool;
+            $grepGatttool = qx(ps ax| grep -E \'gatttool -b $mac\' | grep -v grep);
+            $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E \'gatttool -b $mac\' | grep -v grep') if($sshHost ne 'none');
+            if(not $grepGatttool =~ /^\s*$/) {
+                Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
+                sleep(1);
+            } else {
+                $wait = 0;
+            }
         }
-    } else {
-    
-        while ( (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop = 0) or (qx(ps ax | grep -v grep | grep "gatttool -b $mac") and $loop < 5) ) {
         
-            Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - check gattool is running at local host. loop: $loop";
-            sleep 0.5;
-            $loop++;
-        }
-    }
-    
-    
-    
-    #### Read Sensor Data
-    
-    ## support for Firmware 2.6.6, man muß erst einen Characterwert schreiben
-    Log3 $name, 5, "Sub XiaomiFlowerSens_callGatttool ($name) - WFR: $wfr";
-    if($wfr == 1) {
+        $cmd .= "ssh $sshHost '" if($sshHost ne 'none');
+        $cmd .= "gatttool -i $hci -b $mac ";
+        $cmd .= "--char-read -a $handle" if($gattCmd eq 'read');
+        $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
+        $cmd .= " 2>&1 /dev/null";
+        $cmd .= "'" if($sshHost ne 'none');
         
         $loop = 0;
         do {
-
-            if( $sshHost ne 'none' ) {
             
-                $wresp      = qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null');
-                Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - write data to host $sshHost";
-                
-            } else {
-            
-                $wresp      = qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F 2>&1 /dev/null);
-                Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - write data to local host";
-            }
-            
+            Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: call gatttool with command $cmd and loop $loop";
+            @gtResult = split(": ",qx($cmd));
+            Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charWrite loop $loop";
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - charWrite wresp: $wresp" if(defined($wresp) and ($wresp) );
             
-        } while( ($loop < 10) and (not $wresp =~ /^Characteristic value was written successfully$/) );
+        } while( $loop < 5 and $gtResult[0] eq 'connect error' );
+        
+        Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
+        
+        $gtResult[1] = 'none'
+        unless( defined($gtResult[1]) );
+        
+        my $json_notification = XiaomiFlowerSens_encodeJSON($gtResult[1]);
+        
+        if($gtResult[0] ne 'connect error') {
+            return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
+        } else {
+            return "$name|$mac|error|$gattCmd|$handle|$json_notification";
+        }
+    } else {
+        return "$name|$mac|error|$gattCmd|$handle|no gatttool binary found. Please check if bluez-package is properly installed";
     }
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - run gatttool";
-    
-    $loop = 0;
-    do {
-
-        if( $sshHost ne 'none' ) {
-        
-            @readSensData   = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from host $sshHost";
-            
-        } else {
-        
-            @readSensData   = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call data from local host";
-        }
-
-        $loop++;
-        Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call gatttool charRead loop $loop";
-    
-    } while( $loop < 10 and not $readSensData[0] =~ /^Characteristic value\/descriptor$/ );
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData[0]: $readSensData[0]";
-    Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. sensData: $readSensData[1]";
-    
-    return ($readSensData[1],undef)
-    unless( $readSensData[0] =~ /^Characteristic value\/descriptor$/ );
-    
-    
-    ### Read Firmware and Battery Data
-    $loop = 0;
-    do {
-
-        if( $sshHost ne 'none' ) {
-        
-            @readBatFwData  = split(": ",qx(ssh $sshHost 'gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null'));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call firm/batt data from host $sshHost";
-        
-        } else {
-        
-            @readBatFwData  = split(": ",qx(gatttool -i $hci -b $mac --char-read -a 0x38 2>&1 /dev/null));
-            Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - call firm/batt data from host local host";
-        }
-
-        $loop++;
-        Log3 $name, 4, "Sub XiaomiFlowerSens ($name) - call gatttool readBatFw loop $loop";
-    
-    } while( $loop < 10 and not $readBatFwData[0] =~ /^Characteristic value\/descriptor$/ );
-    
-    Log3 $name, 4, "Sub XiaomiFlowerSens_callGatttool ($name) - processing gatttool response. batFwData: $readBatFwData[1]";
-    
-    return ($readBatFwData[1],undef)
-    unless( $readBatFwData[0] =~ /^Characteristic value\/descriptor$/ );
-    
-    
-    
-    
-    ### no Error in data string
-    return ($readSensData[1],$readBatFwData[1])
 }
 
-sub XiaomiFlowerSens_forRun_encodeJSON($$) {
+sub XiaomiFlowerSens_ExecGatttool_Done($) {
 
-    my ($mac,$wfr) = @_;
-
-    my %data = (
-        'mac'           => $mac,
-        'wfr'           => $wfr
-    );
+    my $string      = shift;
+    my ($name,$mac,$respstate,$gattCmd,$handle,$json_notification) = split("\\|", $string);
     
-    return encode_json \%data;
-}
-
-sub XiaomiFlowerSens_forDone_encodeJSON($$$$$$) {
-
-    my ($temp,$lux,$moisture,$fertility,$blevel,$fw)        = @_;
-
-    my %response = (
-        'temp'      => $temp,
-        'lux'       => $lux,
-        'moisture'  => $moisture,
-        'fertility' => $fertility,
-        'blevel'    => $blevel,
-        'firmware'  => $fw
-    );
-    
-    return encode_json \%response;
-}
-
-sub XiaomiFlowerSens_BlockingDone($) {
-
-    my ($string)            = @_;
-    my ($name,$response)    = split("\\|",$string);
     my $hash                = $defs{$name};
     
     
     delete($hash->{helper}{RUNNING_PID});
     
-    Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingDone ($name) - Der Helper ist diabled. Daher wird hier abgebrochen" if($hash->{helper}{DISABLED});
+    Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Done: Helper is disabled. Stop processing" if($hash->{helper}{DISABLED});
     return if($hash->{helper}{DISABLED});
     
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Done: gatttool return string: $string";
     
-    readingsBeginUpdate($hash);
-    
-    if( $response eq "corrupted data" ) {
-        readingsBulkUpdate($hash,"state","corrupted data");
-        readingsEndUpdate($hash,1);
-        return undef;
-        
-    } elsif( $response eq "charWrite faild") {
-        readingsBulkUpdate($hash,"state","charWrite faild");
-        readingsEndUpdate($hash,1);
-        return undef;
-        
-    } elsif( $response eq "Unknown Error, look at verbose 5 output" ) {
-        
-        readingsBulkUpdate($hash,"lastGattError","$response");
-        readingsBulkUpdate($hash,"state","unreachable");
-        readingsEndUpdate($hash,1);
-        return undef;    
-        
-    } elsif( ref($response) eq "HASH" ) {
-        readingsBulkUpdate($hash,"lastGattError","$response");
-        readingsBulkUpdate($hash,"state","unreachable");
-        readingsEndUpdate($hash,1);
-        return undef;
+    my $decode_json =   eval{decode_json($json_notification)};
+    if($@){
+        Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Done: JSON error while request: $@";
     }
     
+    XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult})
+    if( $respstate eq 'ok' and $gattCmd eq 'read' );
     
-    my $response_json = decode_json($response);
+    XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult})
+    unless( $respstate eq 'ok' );
     
-    readingsBulkUpdate($hash, "batteryLevel", $response_json->{blevel});
-    readingsBulkUpdate($hash, "battery", ($response_json->{blevel}>20?"ok":"low") );
-    readingsBulkUpdate($hash, "temperature", $response_json->{temp}/10);
-    readingsBulkUpdate($hash, "lux", $response_json->{lux});
-    readingsBulkUpdate($hash, "moisture", $response_json->{moisture});
-    readingsBulkUpdate($hash, "fertility", $response_json->{fertility});
-    readingsBulkUpdate($hash, "firmware", $response_json->{firmware});
-    readingsBulkUpdate($hash, "state", "active") if( ReadingsVal($name,"state", 0) eq "call data" or ReadingsVal($name,"state", 0) eq "unreachable" or ReadingsVal($name,"state", 0) eq "corrupted data" );
-
-    readingsEndUpdate($hash,1);
-
-
-    DoTrigger($name, 'minFertility ' . ($response_json->{fertility}<AttrVal($name,'minFertility',0)?'low':'ok')) if( AttrVal($name,'minFertility','none') ne 'none' );
-    DoTrigger($name, 'maxFertility ' . ($response_json->{fertility}>AttrVal($name,'maxFertility',0)?'high':'ok')) if( AttrVal($name,'maxFertility','none') ne 'none' );
-    
-    DoTrigger($name, 'minTemp ' . ($response_json->{temp}/10<AttrVal($name,'minTemp',0)?'low':'ok')) if( AttrVal($name,'minTemp','none') ne 'none' );
-    DoTrigger($name, 'maxTemp ' . ($response_json->{temp}/10>AttrVal($name,'maxTemp',0)?'high':'ok')) if( AttrVal($name,'maxTemp','none') ne 'none' );
-    
-    DoTrigger($name, 'minMoisture ' . ($response_json->{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
-    DoTrigger($name, 'maxMoisture ' . ($response_json->{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
-    
-    DoTrigger($name, 'minLux ' . ($response_json->{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
-    DoTrigger($name, 'maxLux ' . ($response_json->{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
-
-
-    Log3 $name, 4, "Sub XiaomiFlowerSens_BlockingDone ($name) - Abschluss!";
+    XiaomiFlowerSens_CallSensData($hash)
+    unless( $gattCmd eq 'read' );
 }
 
-sub XiaomiFlowerSens_BlockingAborted($) {
+sub XiaomiFlowerSens_ExecGatttool_Aborted($) {
 
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
 
     delete($hash->{helper}{RUNNING_PID});
     readingsSingleUpdate($hash,"state","unreachable", 1);
-    Log3 $name, 3, "($name) Sub XiaomiFlowerSens_BlockingAborted - The BlockingCall Process terminated unexpectedly. Timedout";
+
+    Log3 $name, 3, "XiaomiFlowerSens ($name) - ExecGatttool_Aborted: The BlockingCall Process terminated unexpectedly. Timedout";
 }
 
+sub XiaomiFlowerSens_ProcessingNotification($@) {
+
+    my ($hash,$handle,$notification)    = @_;
+    
+    my $name    = $hash->{NAME};
+    
+    Log3 $name, 5, "XiaomiFlowerSens ($name) - ProcessingNotification";
+    
+    if( $handle eq '0x38' ) {
+        ### Read Firmware and Battery Data
+        Log3 $name, 4, "XiaomiFlowerSens ($name) - ProcessingNotification: handle 0x38";
+        
+        XiaomiFlowerSens_Handle0x38($hash,$notification);
+        
+    } elsif( $handle eq '0x35' ) {
+        ### Read Sensor Data
+        Log3 $name, 4, "XiaomiFlowerSens ($name) - ProcessingNotification: handle 0x35";
+        
+        XiaomiFlowerSens_Handle0x35($hash,$notification);
+    }
+}
+
+sub XiaomiFlowerSens_Handle0x38($$) {
+
+    my ($hash,$notification)    = @_;
+    
+    my $name                    = $hash->{NAME};
+    
+    
+    Log3 $name, 5, "XiaomiFlowerSens ($name) - Handle0x38";
+    ### Read Firmware and Battery Data
+        
+    my @dataBatFw   = split(" ",$notification);
+    my $blevel      = hex("0x".$dataBatFw[0]);
+    my $fw          = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
+        
+    $readings{'batteryLevel'}   = $blevel;
+    $readings{'battery'}        = ($blevel > 20?"ok":"low");
+    $readings{'firmware'}       = $fw;
+        
+    $hash->{helper}{CallBatteryFirmware} = 1;
+    XiaomiFlowerSens_WriteReadings($hash);
+}
+
+sub XiaomiFlowerSens_Handle0x35($$) {
+
+    my ($hash,$notification)    = @_;
+    
+    my $name                    = $hash->{NAME};
+    
+    
+    Log3 $name, 5, "XiaomiFlowerSens ($name) - Handle0x35";
+    
+    my @dataSensor  = split(" ",$notification);
+
+
+    return XiaomiFlowerSens_stateRequest($hash)
+    unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
+
+
+    my $temp;
+        
+    if( $dataSensor[1] eq "ff" ) {
+        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff");
+    } else {
+        $temp       = hex("0x".$dataSensor[1].$dataSensor[0]);
+    }
+        
+    my $lux         = hex("0x".$dataSensor[4].$dataSensor[3]);
+    my $moisture    = hex("0x".$dataSensor[7]);
+    my $fertility   = hex("0x".$dataSensor[9].$dataSensor[8]);
+
+    $readings{'temperature'}    = $temp/10;
+    $readings{'lux'}            = $lux;
+    $readings{'moisture'}       = $moisture;
+    $readings{'fertility'}      = $fertility;
+        
+    $hash->{helper}{CallBatteryFirmware} = 0;
+    XiaomiFlowerSens_WriteReadings($hash);
+}
+
+sub XiaomiFlowerSens_WriteReadings($) {
+
+    my ($hash)    = @_;
+    
+    my $name                = $hash->{NAME};
+
+
+    readingsBeginUpdate($hash);
+    while( my ($r,$v) = each %readings ) {
+        readingsBulkUpdateIfChanged($hash,$r,$v);
+    }
+
+    readingsBulkUpdateIfChanged($hash, "state", "active");
+    readingsEndUpdate($hash,1);
 
 
 
+    
+    if( defined($readings{temperature}) ) {
+        DoTrigger($name, 'minFertility ' . ($readings{fertility}<AttrVal($name,'minFertility',0)?'low':'ok')) if( AttrVal($name,'minFertility','none') ne 'none' );
+        DoTrigger($name, 'maxFertility ' . ($readings{fertility}>AttrVal($name,'maxFertility',0)?'high':'ok')) if( AttrVal($name,'maxFertility','none') ne 'none' );
+    
+        DoTrigger($name, 'minTemp ' . ($readings{temperature}<AttrVal($name,'minTemp',0)?'low':'ok')) if( AttrVal($name,'minTemp','none') ne 'none' );
+        DoTrigger($name, 'maxTemp ' . ($readings{temperature}>AttrVal($name,'maxTemp',0)?'high':'ok')) if( AttrVal($name,'maxTemp','none') ne 'none' );
+    
+        DoTrigger($name, 'minMoisture ' . ($readings{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
+        DoTrigger($name, 'maxMoisture ' . ($readings{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
+    
+        DoTrigger($name, 'minLux ' . ($readings{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
+        DoTrigger($name, 'maxLux ' . ($readings{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
+    }
+    
 
 
+
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - WriteReadings: Readings were written";
+    
+    %readings = ();
+    XiaomiFlowerSens_stateRequest($hash) if( $hash->{helper}{CallBatteryFirmware} == 1 );
+}
+
+sub XiaomiFlowerSens_ProcessingErrors($$) {
+
+    my ($hash,$notification)    = @_;
+    
+    my $name                    = $hash->{NAME};
+    
+    Log3 $name, 5, "XiaomiFlowerSens ($name) - ProcessingErrors";
+    $readings{'lastGattError'} = $notification;
+    
+    XiaomiFlowerSens_WriteReadings($hash);
+}
+
+### my little Helper
+sub XiaomiFlowerSens_encodeJSON($) {
+
+    my $gtResult    = shift;
+
+    my %response = (
+        'gtResult'      => $gtResult
+    );
+    
+    return encode_json \%response;
+}
 
 
 
