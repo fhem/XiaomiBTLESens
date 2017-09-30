@@ -219,6 +219,11 @@ sub XiaomiFlowerSens_stateRequest($) {
     
     if( !IsDisabled($name) ) {
         if( ReadingsVal($name,'firmware','none') ne 'none') {
+        
+            return XiaomiFlowerSens_CallBatteryFirmware($hash)
+            if( XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($hash,'90000') );
+            
+
             if( ReadingsVal($name, 'firmware', '') eq '2.6.2') {
             
                 XiaomiFlowerSens_CallSensData($hash);
@@ -458,15 +463,14 @@ sub XiaomiFlowerSens_ProcessingNotification($@) {
 }
 
 sub XiaomiFlowerSens_Handle0x38($$) {
-
+    ### Read Firmware and Battery Data
     my ($hash,$notification)    = @_;
     
     my $name                    = $hash->{NAME};
     
     
     Log3 $name, 5, "XiaomiFlowerSens ($name) - Handle0x38";
-    ### Read Firmware and Battery Data
-        
+
     my @dataBatFw   = split(" ",$notification);
     my $blevel      = hex("0x".$dataBatFw[0]);
     my $fw          = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
@@ -477,10 +481,12 @@ sub XiaomiFlowerSens_Handle0x38($$) {
         
     $hash->{helper}{CallBatteryFirmware} = 1;
     XiaomiFlowerSens_WriteReadings($hash);
+    
+    XiaomiFlowerSens_CallBatteryFirmware_Timestamp($hash);
 }
 
 sub XiaomiFlowerSens_Handle0x35($$) {
-
+    ### Read Sensor Data
     my ($hash,$notification)    = @_;
     
     my $name                    = $hash->{NAME};
@@ -569,7 +575,7 @@ sub XiaomiFlowerSens_ProcessingErrors($$) {
     XiaomiFlowerSens_WriteReadings($hash);
 }
 
-### my little Helper
+#### my little Helper
 sub XiaomiFlowerSens_encodeJSON($) {
 
     my $gtResult    = shift;
@@ -581,6 +587,34 @@ sub XiaomiFlowerSens_encodeJSON($) {
     return encode_json \%response;
 }
 
+## Routinen damit Firmware und Batterie nur alle X male statt immer aufgerufen wird
+sub XiaomiFlowerSens_CallBatteryFirmware_Timestamp($) {
+
+    my $hash    = shift;
+    
+    
+    # get timestamp
+    $hash->{helper}{updateTimeCallBatteryFirmware}      = gettimeofday(); # in seconds since the epoch
+    $hash->{helper}{updateTimestampCallBatteryFirmware} = FmtDateTime(gettimeofday());
+}
+
+sub XiaomiFlowerSens_CallBatteryFirmware_UpdateTimeAge($) {
+
+    my $hash    = shift;
+
+    my $UpdateTimeAge = gettimeofday() - $hash->{helper}{updateTimeCallBatteryFirmware};
+    
+    
+    return $UpdateTimeAge;
+}
+
+sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
+
+    my ($hash,$maxAge)    = @_;;
+    
+    
+    return (XiaomiFlowerSens_CallBatteryFirmware_UpdateTimeAge($hash)>$maxAge ? 1:0);
+}
 
 
 
