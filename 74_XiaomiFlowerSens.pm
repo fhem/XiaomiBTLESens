@@ -46,7 +46,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.46";
+my $version = "1.1.47";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -392,7 +392,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
         
-        $gtResult[1] = 'none'
+        $gtResult[1] = 'none response data'
         unless( defined($gtResult[1]) );
         
         my $json_notification = XiaomiFlowerSens_encodeJSON($gtResult[1]);
@@ -428,10 +428,10 @@ sub XiaomiFlowerSens_ExecGatttool_Done($) {
     }
     
     XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult})
-    if( $respstate eq 'ok' and $gattCmd eq 'read' and $decode_json->{gtResult} ne 'none' );
+    if( $respstate eq 'ok' and $gattCmd eq 'read' and $decode_json->{gtResult} ne 'none response data' );
     
     XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult})
-    if( ($respstate eq 'error') or ($respstate eq 'ok' and $decode_json->{gtResult} eq 'none' and $gattCmd eq 'read') );
+    if( ($respstate eq 'error') or ($respstate eq 'ok' and $decode_json->{gtResult} eq 'none response data' and $gattCmd eq 'read') );
     
     XiaomiFlowerSens_CallSensData($hash)
     unless( $gattCmd eq 'read' );
