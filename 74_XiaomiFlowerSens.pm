@@ -46,8 +46,15 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.39";
+my $version = "1.1.42";
 my %readings = ();
+my %CallBatteryFirmwareAge = (  '8h'    => 28800,
+                                '16h'   => 57600,
+                                '24h'   => 86400,
+                                '32h'   => 115200,
+                                '40h'   => 144000,
+                                '48h'   => 172800
+    );
 
 
 
@@ -87,6 +94,7 @@ sub XiaomiFlowerSens_Initialize($) {
                             "disable:1 ".
                             "disabledForIntervals ".
                             "hciDevice:hci0,hci1,hci2 ".
+                            "batteryFirmwareAge:8h,16h,24h,32h,40h,48h ".
                             "minFertility ".
                             "maxFertility ".
                             "minTemp ".
@@ -221,7 +229,7 @@ sub XiaomiFlowerSens_stateRequest($) {
         if( ReadingsVal($name,'firmware','none') ne 'none') {
         
             return XiaomiFlowerSens_CallBatteryFirmware($hash)
-            if( XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($hash,'90000') );
+            if( XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($hash,$CallBatteryFirmwareAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
             
 
             if( ReadingsVal($name, 'firmware', '') eq '2.6.2') {
