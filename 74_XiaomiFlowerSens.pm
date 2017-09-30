@@ -602,8 +602,9 @@ sub XiaomiFlowerSens_CallBatteryFirmware_UpdateTimeAge($) {
 
     my $hash    = shift;
 
-    my $UpdateTimeAge = gettimeofday() - $hash->{helper}{updateTimeCallBatteryFirmware};
     
+    $hash->{helper}{updateTimeCallBatteryFirmware}  = 0 if( not defined($hash->{helper}{updateTimeCallBatteryFirmware}) );
+    my $UpdateTimeAge = gettimeofday() - $hash->{helper}{updateTimeCallBatteryFirmware};
     
     return $UpdateTimeAge;
 }
