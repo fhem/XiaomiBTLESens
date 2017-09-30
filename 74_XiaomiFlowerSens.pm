@@ -46,7 +46,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.42";
+my $version = "1.1.46";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -428,10 +428,10 @@ sub XiaomiFlowerSens_ExecGatttool_Done($) {
     }
     
     XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult})
-    if( $respstate eq 'ok' and $gattCmd eq 'read' );
+    if( $respstate eq 'ok' and $gattCmd eq 'read' and $decode_json->{gtResult} ne 'none' );
     
     XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult})
-    unless( $respstate eq 'ok' );
+    if( ($respstate eq 'error') or ($respstate eq 'ok' and $decode_json->{gtResult} eq 'none' and $gattCmd eq 'read') );
     
     XiaomiFlowerSens_CallSensData($hash)
     unless( $gattCmd eq 'read' );
@@ -542,7 +542,8 @@ sub XiaomiFlowerSens_WriteReadings($) {
         readingsBulkUpdateIfChanged($hash,$r,$v);
     }
 
-    readingsBulkUpdateIfChanged($hash, "state", "active");
+    #readingsBulkUpdateIfChanged($hash, "state", "active");
+    readingsBulkUpdateIfChanged($hash, "state", ($readings{'lastGattError'}?'unreachable':'active'));
     readingsEndUpdate($hash,1);
 
 
