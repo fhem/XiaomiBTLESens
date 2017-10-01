@@ -30,6 +30,7 @@
 #$cmd = "qx(gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F";
 #$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x35";   # Sensor Daten
 #$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x38";   # Firmware und Batterie
+#  e8 00 00 58 0f 00 00 34 f1 02 02 3c 00 fb 34 9b
         
         
         
@@ -46,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.47";
+my $version = "1.1.50";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -392,12 +393,12 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
         
-        $gtResult[1] = 'none response data'
+        $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
         
         my $json_notification = XiaomiFlowerSens_encodeJSON($gtResult[1]);
         
-        if($gtResult[0] ne 'connect error') {
+        if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
         } else {
             return "$name|$mac|error|$gattCmd|$handle|$json_notification";
@@ -427,14 +428,16 @@ sub XiaomiFlowerSens_ExecGatttool_Done($) {
         Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Done: JSON error while request: $@";
     }
     
-    XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult})
-    if( $respstate eq 'ok' and $gattCmd eq 'read' and $decode_json->{gtResult} ne 'none response data' );
     
-    XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult})
-    if( ($respstate eq 'error') or ($respstate eq 'ok' and $decode_json->{gtResult} eq 'none response data' and $gattCmd eq 'read') );
-    
-    XiaomiFlowerSens_CallSensData($hash)
-    unless( $gattCmd eq 'read' );
+    if( $respstate eq 'ok' ) {
+        XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult});
+        
+    } elsif( $respstate eq 'error' and $gattCmd ne 'write' ) {
+        XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult});
+        
+    } elsif( $gattCmd eq 'write' ) {
+        XiaomiFlowerSens_CallSensData($hash);
+    }
 }
 
 sub XiaomiFlowerSens_ExecGatttool_Aborted($) {
@@ -444,8 +447,11 @@ sub XiaomiFlowerSens_ExecGatttool_Aborted($) {
 
     delete($hash->{helper}{RUNNING_PID});
     readingsSingleUpdate($hash,"state","unreachable", 1);
+    
+    $readings{'lastGattError'} = 'The BlockingCall Process terminated unexpectedly. Timedout';
+    XiaomiFlowerSens_WriteReadings($hash);
 
-    Log3 $name, 3, "XiaomiFlowerSens ($name) - ExecGatttool_Aborted: The BlockingCall Process terminated unexpectedly. Timedout";
+    Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Aborted: The BlockingCall Process terminated unexpectedly. Timedout";
 }
 
 sub XiaomiFlowerSens_ProcessingNotification($@) {
@@ -539,10 +545,9 @@ sub XiaomiFlowerSens_WriteReadings($) {
 
     readingsBeginUpdate($hash);
     while( my ($r,$v) = each %readings ) {
-        readingsBulkUpdateIfChanged($hash,$r,$v);
+        readingsBulkUpdate($hash,$r,$v);
     }
 
-    #readingsBulkUpdateIfChanged($hash, "state", "active");
     readingsBulkUpdateIfChanged($hash, "state", ($readings{'lastGattError'}?'unreachable':'active'));
     readingsEndUpdate($hash,1);
 
