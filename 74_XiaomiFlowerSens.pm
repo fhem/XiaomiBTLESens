@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.50";
+my $version = "1.1.51";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -77,6 +77,10 @@ sub XiaomiFlowerSens_ExecGatttool_Aborted($);
 sub XiaomiFlowerSens_ProcessingNotification($@);
 sub XiaomiFlowerSens_WriteReadings($);
 sub XiaomiFlowerSens_ProcessingErrors($$);
+sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$);
+sub XiaomiFlowerSens_CallBatteryFirmware_Timestamp($);
+sub XiaomiFlowerSens_CallBatteryFirmware_UpdateTimeAge($);
+sub XiaomiFlowerSens_encodeJSON($);
 
 
 
@@ -174,6 +178,7 @@ sub XiaomiFlowerSens_Attr(@) {
 
     if( $attrName eq "disable" ) {
         if( $cmd eq "set" and $attrVal eq "1" ) {
+            RemoveInternalTimer($hash);
             readingsSingleUpdate ( $hash, "state", "disabled", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - disabled";
         }
@@ -777,6 +782,7 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
     2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br />
     2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high<br /><br /></li>
     <li>sshHost - FQDN oder IP-Adresse eines entfernten SSH-Systems. Das SSH-System ist auf eine Zertifikat basierte Authentifizierung zu konfigurieren. Am elegantesten geschieht das mit einer  .ssh/config Datei auf dem SSH-Client.</li>
+    <li>batteryFirmwareAge - how old can the reading befor fetch new data</li>
   </ul>
 </ul>
 
