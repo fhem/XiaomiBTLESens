@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.51";
+my $version = "1.1.58";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -81,6 +81,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$);
 sub XiaomiFlowerSens_CallBatteryFirmware_Timestamp($);
 sub XiaomiFlowerSens_CallBatteryFirmware_UpdateTimeAge($);
 sub XiaomiFlowerSens_encodeJSON($);
+sub XiaomiFlowerSens_Handle0x35($$);
+sub XiaomiFlowerSens_Handle0x38($$);
 
 
 
@@ -133,6 +135,7 @@ sub XiaomiFlowerSens_Define($$) {
     $hash->{BTMAC}      = $mac;
     $hash->{VERSION} 	= $version;
     $hash->{INTERVAL}   = 300;
+    $hash->{helper}{CallSensDataCounter} = 0;
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
@@ -239,12 +242,19 @@ sub XiaomiFlowerSens_stateRequest($) {
             
 
             if( ReadingsVal($name, 'firmware', '') eq '2.6.2') {
-            
                 XiaomiFlowerSens_CallSensData($hash);
-                
+
             } else {
-            
-                XiaomiFlowerSens_WriteSensData($hash);
+                if( $hash->{helper}{CallSensDataCounter} < 1 ) {
+                    XiaomiFlowerSens_WriteSensData($hash);
+                    $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
+                    
+                } else {
+                    $readings{'lastGattError'} = 'charWrite faild';
+                    XiaomiFlowerSens_WriteReadings($hash);
+                    $hash->{helper}{CallSensDataCounter} = 0;
+                    return;
+                }
             }
             
         } else {
@@ -268,9 +278,6 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     RemoveInternalTimer($hash);
     
     if( not IsDisabled($name) ) {
-    
-        #readingsSingleUpdate ( $hash, "state", "active", 1 ) if( (ReadingsVal($name, "state", 0) eq "initialized" or ReadingsVal($name, "state", 0) eq "unreachable" or ReadingsVal($name, "state", 0) eq "disabled" or ReadingsVal($name, "state", 0) eq "Unknown") );
-        
         
         XiaomiFlowerSens_stateRequest($hash);
         
@@ -352,9 +359,11 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
     
     my ($name,$mac,$gattCmd,$handle,$value) = split("\\|", $string);
     my $sshHost                             = AttrVal($name,"sshHost","none");
+    my $gatttool;
 
 
-    my $gatttool                            = qx(which gatttool);
+    $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
+    $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
     
     if(-x $gatttool) {
@@ -369,8 +378,9 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         while($wait) {
         
             my $grepGatttool;
-            $grepGatttool = qx(ps ax| grep -E \'gatttool -b $mac\' | grep -v grep);
-            $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E \'gatttool -b $mac\' | grep -v grep') if($sshHost ne 'none');
+            $grepGatttool = qx(ps ax| grep -E \'gatttool -i $hci -b $mac\' | grep -v grep) if($sshHost eq 'none');
+            $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hci -b $mac" | grep -v grep') if($sshHost ne 'none');
+
             if(not $grepGatttool =~ /^\s*$/) {
                 Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
                 sleep(1);
@@ -405,6 +415,8 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
+        } elsif($gtResult[0] ne 'connect error' and $gattCmd eq 'write') {
+            return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
         } else {
             return "$name|$mac|error|$gattCmd|$handle|$json_notification";
         }
@@ -434,14 +446,14 @@ sub XiaomiFlowerSens_ExecGatttool_Done($) {
     }
     
     
-    if( $respstate eq 'ok' ) {
+    if( $respstate eq 'ok' and $gattCmd eq 'read' ) {
         XiaomiFlowerSens_ProcessingNotification($hash,$handle,$decode_json->{gtResult});
         
-    } elsif( $respstate eq 'error' and $gattCmd ne 'write' ) {
-        XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult});
-        
-    } elsif( $gattCmd eq 'write' ) {
+    } elsif( $respstate eq 'ok' and $gattCmd eq 'write' ) {
         XiaomiFlowerSens_CallSensData($hash);
+        
+    } else {
+        XiaomiFlowerSens_ProcessingErrors($hash,$decode_json->{gtResult});
     }
 }
 
@@ -553,7 +565,7 @@ sub XiaomiFlowerSens_WriteReadings($) {
         readingsBulkUpdate($hash,$r,$v);
     }
 
-    readingsBulkUpdateIfChanged($hash, "state", ($readings{'lastGattError'}?'unreachable':'active'));
+    readingsBulkUpdateIfChanged($hash, "state", ($readings{'lastGattError'}?'error':'active'));
     readingsEndUpdate($hash,1);
 
 
@@ -579,6 +591,7 @@ sub XiaomiFlowerSens_WriteReadings($) {
     Log3 $name, 4, "XiaomiFlowerSens ($name) - WriteReadings: Readings were written";
     
     %readings = ();
+    $hash->{helper}{CallSensDataCounter} = 0;
     XiaomiFlowerSens_stateRequest($hash) if( $hash->{helper}{CallBatteryFirmware} == 1 );
 }
 
