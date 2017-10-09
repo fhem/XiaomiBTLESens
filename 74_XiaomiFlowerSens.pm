@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.58";
+my $version = "1.1.60";
 my %readings = ();
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
@@ -416,7 +416,11 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
         } elsif($gtResult[0] ne 'connect error' and $gattCmd eq 'write') {
-            return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
+            if( $sshHost ne 'none' ) {
+                XiaomiFlowerSens_ExecGatttool_Run($name."|".$mac."|read|0x35");
+            } else {
+                return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
+            }
         } else {
             return "$name|$mac|error|$gattCmd|$handle|$json_notification";
         }
