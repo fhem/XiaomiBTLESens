@@ -47,8 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.60";
-my %readings = ();
+my $version = "1.1.65";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -68,6 +67,7 @@ sub XiaomiFlowerSens_Attr(@);
 sub XiaomiFlowerSens_stateRequest($);
 sub XiaomiFlowerSens_stateRequestTimer($);
 sub XiaomiFlowerSens_Set($$@);
+sub XiaomiFlowerSens_Get($$@);
 sub XiaomiFlowerSens_CallBatteryFirmware($);
 sub XiaomiFlowerSens_CallSensData($);
 sub XiaomiFlowerSens_WriteSensData($);
@@ -75,7 +75,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($);
 sub XiaomiFlowerSens_ExecGatttool_Done($);
 sub XiaomiFlowerSens_ExecGatttool_Aborted($);
 sub XiaomiFlowerSens_ProcessingNotification($@);
-sub XiaomiFlowerSens_WriteReadings($);
+sub XiaomiFlowerSens_WriteReadings($$);
 sub XiaomiFlowerSens_ProcessingErrors($$);
 sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$);
 sub XiaomiFlowerSens_CallBatteryFirmware_Timestamp($);
@@ -94,6 +94,7 @@ sub XiaomiFlowerSens_Initialize($) {
     my ($hash) = @_;
 
     $hash->{SetFn}      = "XiaomiFlowerSens_Set";
+    $hash->{GetFn}      = "XiaomiFlowerSens_Get";
     $hash->{DefFn}      = "XiaomiFlowerSens_Define";
     $hash->{UndefFn}    = "XiaomiFlowerSens_Undef";
     $hash->{AttrFn}     = "XiaomiFlowerSens_Attr";
@@ -232,6 +233,7 @@ sub XiaomiFlowerSens_stateRequest($) {
 
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
+    my %readings;
     
     
     if( !IsDisabled($name) ) {
@@ -251,7 +253,7 @@ sub XiaomiFlowerSens_stateRequest($) {
                     
                 } else {
                     $readings{'lastGattError'} = 'charWrite faild';
-                    XiaomiFlowerSens_WriteReadings($hash);
+                    XiaomiFlowerSens_WriteReadings($hash,\%readings);
                     $hash->{helper}{CallSensDataCounter} = 0;
                     return;
                 }
@@ -335,18 +337,32 @@ sub XiaomiFlowerSens_Set($$@) {
     my ($cmd, @args)         = @aa;
     
 
-    if( $cmd eq 'statusRequest' ) {
-        return "usage: statusRequest" if( @args != 0 );
-    
-        XiaomiFlowerSens_stateRequest($hash);
-        
-    } elsif( $cmd eq 'clearFirmwareReading' ) {
+    if( $cmd eq 'clearFirmwareReading' ) {
         return "usage: clearFirmwareReading" if( @args != 0 );
     
         readingsSingleUpdate($hash,'firmware','',0);
     
     } else {
-        my $list = "statusRequest:noArg clearFirmwareReading:noArg";
+        my $list = "clearFirmwareReading:noArg";
+        return "Unknown argument $cmd, choose one of $list";
+    }
+    
+    return undef;
+}
+
+sub XiaomiFlowerSens_Get($$@) {
+    
+    my ($hash, $name, @aa)  = @_;
+    my ($cmd, @args)         = @aa;
+    
+
+    if( $cmd eq 'statusRequest' ) {
+        return "usage: statusRequest" if( @args != 0 );
+    
+        XiaomiFlowerSens_stateRequest($hash);
+        
+    } else {
+        my $list = "statusRequest:noArg";
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -465,12 +481,13 @@ sub XiaomiFlowerSens_ExecGatttool_Aborted($) {
 
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
+    my %readings;
 
     delete($hash->{helper}{RUNNING_PID});
     readingsSingleUpdate($hash,"state","unreachable", 1);
     
     $readings{'lastGattError'} = 'The BlockingCall Process terminated unexpectedly. Timedout';
-    XiaomiFlowerSens_WriteReadings($hash);
+    XiaomiFlowerSens_WriteReadings($hash,\%readings);
 
     Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Aborted: The BlockingCall Process terminated unexpectedly. Timedout";
 }
@@ -502,6 +519,7 @@ sub XiaomiFlowerSens_Handle0x38($$) {
     my ($hash,$notification)    = @_;
     
     my $name                    = $hash->{NAME};
+    my %readings;
     
     
     Log3 $name, 5, "XiaomiFlowerSens ($name) - Handle0x38";
@@ -515,7 +533,7 @@ sub XiaomiFlowerSens_Handle0x38($$) {
     $readings{'firmware'}       = $fw;
         
     $hash->{helper}{CallBatteryFirmware} = 1;
-    XiaomiFlowerSens_WriteReadings($hash);
+    XiaomiFlowerSens_WriteReadings($hash,\%readings);
     
     XiaomiFlowerSens_CallBatteryFirmware_Timestamp($hash);
 }
@@ -525,6 +543,7 @@ sub XiaomiFlowerSens_Handle0x35($$) {
     my ($hash,$notification)    = @_;
     
     my $name                    = $hash->{NAME};
+    my %readings;
     
     
     Log3 $name, 5, "XiaomiFlowerSens ($name) - Handle0x35";
@@ -554,47 +573,46 @@ sub XiaomiFlowerSens_Handle0x35($$) {
     $readings{'fertility'}      = $fertility;
         
     $hash->{helper}{CallBatteryFirmware} = 0;
-    XiaomiFlowerSens_WriteReadings($hash);
+    XiaomiFlowerSens_WriteReadings($hash,\%readings);
 }
 
-sub XiaomiFlowerSens_WriteReadings($) {
+sub XiaomiFlowerSens_WriteReadings($$) {
 
-    my ($hash)    = @_;
+    my ($hash,$readings)    = @_;
     
     my $name                = $hash->{NAME};
 
 
     readingsBeginUpdate($hash);
-    while( my ($r,$v) = each %readings ) {
+    while( my ($r,$v) = each %{$readings} ) {
         readingsBulkUpdate($hash,$r,$v);
     }
 
-    readingsBulkUpdateIfChanged($hash, "state", ($readings{'lastGattError'}?'error':'active'));
+    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'active'));
     readingsEndUpdate($hash,1);
 
 
 
     
-    if( defined($readings{temperature}) ) {
-        DoTrigger($name, 'minFertility ' . ($readings{fertility}<AttrVal($name,'minFertility',0)?'low':'ok')) if( AttrVal($name,'minFertility','none') ne 'none' );
-        DoTrigger($name, 'maxFertility ' . ($readings{fertility}>AttrVal($name,'maxFertility',0)?'high':'ok')) if( AttrVal($name,'maxFertility','none') ne 'none' );
+    if( defined($readings->{temperature}) ) {
+        DoTrigger($name, 'minFertility ' . ($readings->{fertility}<AttrVal($name,'minFertility',0)?'low':'ok')) if( AttrVal($name,'minFertility','none') ne 'none' );
+        DoTrigger($name, 'maxFertility ' . ($readings->{fertility}>AttrVal($name,'maxFertility',0)?'high':'ok')) if( AttrVal($name,'maxFertility','none') ne 'none' );
     
-        DoTrigger($name, 'minTemp ' . ($readings{temperature}<AttrVal($name,'minTemp',0)?'low':'ok')) if( AttrVal($name,'minTemp','none') ne 'none' );
-        DoTrigger($name, 'maxTemp ' . ($readings{temperature}>AttrVal($name,'maxTemp',0)?'high':'ok')) if( AttrVal($name,'maxTemp','none') ne 'none' );
+        DoTrigger($name, 'minTemp ' . ($readings->{temperature}<AttrVal($name,'minTemp',0)?'low':'ok')) if( AttrVal($name,'minTemp','none') ne 'none' );
+        DoTrigger($name, 'maxTemp ' . ($readings->{temperature}>AttrVal($name,'maxTemp',0)?'high':'ok')) if( AttrVal($name,'maxTemp','none') ne 'none' );
     
-        DoTrigger($name, 'minMoisture ' . ($readings{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
-        DoTrigger($name, 'maxMoisture ' . ($readings{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
+        DoTrigger($name, 'minMoisture ' . ($readings->{moisture}<AttrVal($name,'minMoisture',0)?'low':'ok')) if( AttrVal($name,'minMoisture','none') ne 'none' );
+        DoTrigger($name, 'maxMoisture ' . ($readings->{moisture}>AttrVal($name,'maxMoisture',0)?'high':'ok')) if( AttrVal($name,'maxMoisture','none') ne 'none' );
     
-        DoTrigger($name, 'minLux ' . ($readings{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
-        DoTrigger($name, 'maxLux ' . ($readings{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
+        DoTrigger($name, 'minLux ' . ($readings->{lux}<AttrVal($name,'minLux',0)?'low':'ok')) if( AttrVal($name,'minLux','none') ne 'none' );
+        DoTrigger($name, 'maxLux ' . ($readings->{lux}>AttrVal($name,'maxLux',0)?'high':'ok')) if( AttrVal($name,'maxLux','none') ne 'none' );
     }
     
 
 
 
     Log3 $name, 4, "XiaomiFlowerSens ($name) - WriteReadings: Readings were written";
-    
-    %readings = ();
+
     $hash->{helper}{CallSensDataCounter} = 0;
     XiaomiFlowerSens_stateRequest($hash) if( $hash->{helper}{CallBatteryFirmware} == 1 );
 }
@@ -604,11 +622,12 @@ sub XiaomiFlowerSens_ProcessingErrors($$) {
     my ($hash,$notification)    = @_;
     
     my $name                    = $hash->{NAME};
+    my %readings;
     
     Log3 $name, 5, "XiaomiFlowerSens ($name) - ProcessingErrors";
     $readings{'lastGattError'} = $notification;
     
-    XiaomiFlowerSens_WriteReadings($hash);
+    XiaomiFlowerSens_WriteReadings($hash,\%readings);
 }
 
 #### my little Helper
