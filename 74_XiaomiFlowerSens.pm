@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.65";
+my $version = "1.1.68";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -190,6 +190,7 @@ sub XiaomiFlowerSens_Attr(@) {
         elsif( $cmd eq "del" ) {
             readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - enabled";
+            XiaomiFlowerSens_stateRequestTimer($hash);
         }
     }
     
@@ -222,7 +223,7 @@ sub XiaomiFlowerSens_Attr(@) {
         elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
-            XiaomiFlowerSens_stateRequestTimer($hash) if($init_done);
+            XiaomiFlowerSens_stateRequestTimer($hash);
         }
     }
     
@@ -497,6 +498,7 @@ sub XiaomiFlowerSens_ProcessingNotification($@) {
     my ($hash,$handle,$notification)    = @_;
     
     my $name    = $hash->{NAME};
+    my $readings;
     
     Log3 $name, 5, "XiaomiFlowerSens ($name) - ProcessingNotification";
     
@@ -504,14 +506,16 @@ sub XiaomiFlowerSens_ProcessingNotification($@) {
         ### Read Firmware and Battery Data
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ProcessingNotification: handle 0x38";
         
-        XiaomiFlowerSens_Handle0x38($hash,$notification);
+        $readings = XiaomiFlowerSens_Handle0x38($hash,$notification);
         
     } elsif( $handle eq '0x35' ) {
         ### Read Sensor Data
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ProcessingNotification: handle 0x35";
         
-        XiaomiFlowerSens_Handle0x35($hash,$notification);
+        $readings = XiaomiFlowerSens_Handle0x35($hash,$notification);
     }
+    
+    XiaomiFlowerSens_WriteReadings($hash,$readings);
 }
 
 sub XiaomiFlowerSens_Handle0x38($$) {
@@ -533,9 +537,8 @@ sub XiaomiFlowerSens_Handle0x38($$) {
     $readings{'firmware'}       = $fw;
         
     $hash->{helper}{CallBatteryFirmware} = 1;
-    XiaomiFlowerSens_WriteReadings($hash,\%readings);
-    
     XiaomiFlowerSens_CallBatteryFirmware_Timestamp($hash);
+    return \%readings;
 }
 
 sub XiaomiFlowerSens_Handle0x35($$) {
@@ -573,7 +576,7 @@ sub XiaomiFlowerSens_Handle0x35($$) {
     $readings{'fertility'}      = $fertility;
         
     $hash->{helper}{CallBatteryFirmware} = 0;
-    XiaomiFlowerSens_WriteReadings($hash,\%readings);
+    return \%readings;
 }
 
 sub XiaomiFlowerSens_WriteReadings($$) {
@@ -729,8 +732,14 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <a name="XiaomiFlowerSensset"></a>
   <b>Set</b>
   <ul>
-    <li>statusRequest - retrieves the current state of the Xiaomi Flower Monitor.</li>
     <li>clearFirmwareReading - clear firmware reading for new begin.</li>
+    <br>
+  </ul>
+  <br><br>
+  <a name="XiaomiFlowerSensget"></a>
+  <b>Get</b>
+  <ul>
+    <li>statusRequest - retrieves the current state of the Xiaomi Flower Monitor.</li>
     <br>
   </ul>
   <br><br>
@@ -796,8 +805,14 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <a name="XiaomiFlowerSensset"></a>
   <b>Set</b>
   <ul>
-    <li>statusRequest - aktive Abfrage des aktuellen Status des Xiaomi Flower Monitor und seiner Werte</li>
     <li>clearFirmwareReading - l&ouml;scht das Reading firmware f&uuml;r/nach Upgrade</li>
+    <br />
+  </ul>
+  <br /><br />
+  <a name="XiaomiFlowerSensGet"></a>
+  <b>Get</b>
+  <ul>
+    <li>statusRequest - aktive Abfrage des aktuellen Status des Xiaomi Flower Monitor und seiner Werte</li>
     <br />
   </ul>
   <br /><br />
