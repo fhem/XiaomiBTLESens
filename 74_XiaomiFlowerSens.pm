@@ -68,6 +68,7 @@ sub XiaomiFlowerSens_stateRequest($);
 sub XiaomiFlowerSens_stateRequestTimer($);
 sub XiaomiFlowerSens_Set($$@);
 sub XiaomiFlowerSens_Get($$@);
+sub XiaomiFlowerSens_Notify($$);
 sub XiaomiFlowerSens_CallBatteryFirmware($);
 sub XiaomiFlowerSens_CallSensData($);
 sub XiaomiFlowerSens_WriteSensData($);
@@ -96,6 +97,7 @@ sub XiaomiFlowerSens_Initialize($) {
     $hash->{SetFn}      = "XiaomiFlowerSens_Set";
     $hash->{GetFn}      = "XiaomiFlowerSens_Get";
     $hash->{DefFn}      = "XiaomiFlowerSens_Define";
+    $hash->{NotifyFn}   = "XiaomiFlowerSens_Notify";
     $hash->{UndefFn}    = "XiaomiFlowerSens_Undef";
     $hash->{AttrFn}     = "XiaomiFlowerSens_Attr";
     $hash->{AttrList}   = "interval ".
@@ -130,27 +132,18 @@ sub XiaomiFlowerSens_Define($$) {
     return "too few parameters: define <name> XiaomiFlowerSens <BTMAC>" if( @a != 3 );
     
 
-    my $name            = $a[0];
-    my $mac             = $a[2];
+    my $name                                = $a[0];
+    my $mac                                 = $a[2];
     
-    $hash->{BTMAC}      = $mac;
-    $hash->{VERSION} 	= $version;
-    $hash->{INTERVAL}   = 300;
-    $hash->{helper}{CallSensDataCounter} = 0;
+    $hash->{BTMAC}                          = $mac;
+    $hash->{VERSION}                        = $version;
+    $hash->{INTERVAL}                       = 300;
+    $hash->{helper}{CallSensDataCounter}    = 0;
+    $hash->{NOTIFYDEV}                      = "global";
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
     $attr{$name}{room}          = "FlowerSens" if( !defined($attr{$name}{room}) );
-    
-    
-    
-    RemoveInternalTimer($hash);
-    
-    if( $init_done ) {
-        XiaomiFlowerSens_stateRequestTimer($hash);
-    } else {
-        InternalTimer( gettimeofday()+int(rand(30))+15, "XiaomiFlowerSens_stateRequestTimer", $hash, 0 );
-    }
     
     Log3 $name, 3, "XiaomiFlowerSens ($name) - defined with BTMAC $hash->{BTMAC}";
     
@@ -228,6 +221,22 @@ sub XiaomiFlowerSens_Attr(@) {
     }
     
     return undef;
+}
+
+sub XiaomiFlowerSens_Notify($$) {
+
+    my ($hash,$dev) = @_;
+    my $name = $hash->{NAME};
+    return if (IsDisabled($name));
+    
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events = deviceEvents($dev,1);
+    return if (!$events);
+
+
+    XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events} );
+    return;
 }
 
 sub XiaomiFlowerSens_stateRequest($) {
