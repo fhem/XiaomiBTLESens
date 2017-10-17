@@ -181,9 +181,7 @@ sub XiaomiFlowerSens_Attr(@) {
         }
 
         elsif( $cmd eq "del" ) {
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - enabled";
-            XiaomiFlowerSens_stateRequestTimer($hash);
         }
     }
     
@@ -192,12 +190,12 @@ sub XiaomiFlowerSens_Attr(@) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
             Log3 $name, 3, "XiaomiFlowerSens ($name) - disabledForIntervals";
-            readingsSingleUpdate ( $hash, "state", "Unknown", 1 );
+            readingsSingleUpdate ( $hash, "state", "disabled", 1 );
         }
 	
         elsif( $cmd eq "del" ) {
-            readingsSingleUpdate ( $hash, "state", "active", 1 );
             Log3 $name, 3, "XiaomiFlowerSens ($name) - enabled";
+            readingsSingleUpdate ( $hash, "state", "active", 1 );
         }
     }
     
@@ -209,14 +207,12 @@ sub XiaomiFlowerSens_Attr(@) {
             } else {
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to $attrVal";
-                XiaomiFlowerSens_stateRequestTimer($hash) if($init_done);
             }
         }
 
         elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
-            XiaomiFlowerSens_stateRequestTimer($hash);
         }
     }
     
@@ -235,7 +231,8 @@ sub XiaomiFlowerSens_Notify($$) {
     return if (!$events);
 
 
-    XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events} );
+    XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events}
+                                                or grep /^DELETEATTR.$name.disable$/,@{$events} );
     return;
 }
 
@@ -285,11 +282,9 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     my ($hash)      = @_;
     
     my $name        = $hash->{NAME};
+
     
-    
-    RemoveInternalTimer($hash);
-    
-    if( not IsDisabled($name) ) {
+    if( $init_done and not IsDisabled($name) ) {
         
         XiaomiFlowerSens_stateRequest($hash);
         
