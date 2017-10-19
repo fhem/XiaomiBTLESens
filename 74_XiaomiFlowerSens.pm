@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.1.68";
+my $version = "1.1.70";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -232,7 +232,8 @@ sub XiaomiFlowerSens_Notify($$) {
 
 
     XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events}
-                                                or grep /^DELETEATTR.$name.disable$/,@{$events} );
+                                                or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                or (grep /^DEFINED.$name$/,@{$events} and $init_done) );
     return;
 }
 
