@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.2.4";
+my $version = "1.2.5";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -663,7 +663,10 @@ sub XiaomiFlowerSens_ProcessingErrors($$) {
 sub XiaomiFlowerSens_encodeJSON($) {
 
     my $gtResult    = shift;
-
+    
+    
+    chomp($gtResult);
+    
     my %response = (
         'gtResult'      => $gtResult
     );
