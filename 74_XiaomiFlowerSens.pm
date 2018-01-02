@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.2.5";
+my $version = "1.4.0";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -438,6 +438,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
+        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write');
         
         $loop = 0;
         do {
@@ -451,6 +452,9 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
         
+        $handle = '0x35' if($sshHost ne 'none' and $gattCmd eq 'write');
+        $gattCmd = 'read' if($sshHost ne 'none' and $gattCmd eq 'write');
+
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
         
