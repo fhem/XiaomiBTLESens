@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.2.0";
+my $version = "1.4.1";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -114,6 +114,7 @@ sub XiaomiFlowerSens_Initialize($) {
                             "minLux ".
                             "maxLux ".
                             "sshHost ".
+                            "blockingCallLoglevel:2,3,4,5 ".
                             $readingFnAttributes;
 
 
@@ -139,7 +140,9 @@ sub XiaomiFlowerSens_Define($$) {
     $hash->{VERSION}                        = $version;
     $hash->{INTERVAL}                       = 300;
     $hash->{helper}{CallSensDataCounter}    = 0;
+    $hash->{helper}{CallBatteryFirmware}    = 0;
     $hash->{NOTIFYDEV}                      = "global";
+    $hash->{loglevel}                       = 4;
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
@@ -185,7 +188,7 @@ sub XiaomiFlowerSens_Attr(@) {
         }
     }
     
-    if( $attrName eq "disabledForIntervals" ) {
+    elsif( $attrName eq "disabledForIntervals" ) {
         if( $cmd eq "set" ) {
             return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
             unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
@@ -199,7 +202,7 @@ sub XiaomiFlowerSens_Attr(@) {
         }
     }
     
-    if( $attrName eq "interval" ) {
+    elsif( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
             if( $attrVal < 300 ) {
                 Log3 $name, 3, "XiaomiFlowerSens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
@@ -213,6 +216,18 @@ sub XiaomiFlowerSens_Attr(@) {
         elsif( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
             Log3 $name, 3, "XiaomiFlowerSens ($name) - set interval to default";
+        }
+    }
+    
+    elsif( $attrName eq "blockingCallLoglevel" ) {
+        if( $cmd eq "set" ) {
+            $hash->{loglevel} = $attrVal;
+            Log3 $name, 3, "XiaomiFlowerSens ($name) - set blockingCallLoglevel to $attrVal";
+        }
+
+        elsif( $cmd eq "del" ) {
+            $hash->{loglevel} = 4;
+            Log3 $name, 3, "XiaomiFlowerSens ($name) - set blockingCallLoglevel to default";
         }
     }
     
@@ -231,9 +246,13 @@ sub XiaomiFlowerSens_Notify($$) {
     return if (!$events);
 
 
-    XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events}
-                                                or grep /^DELETEATTR.$name.disable$/,@{$events}
-                                                or (grep /^DEFINED.$name$/,@{$events} and $init_done) );
+    XiaomiFlowerSens_stateRequestTimer($hash) if( (grep /^DEFINED.$name$/,@{$events}
+                                                    or grep /^INITIALIZED$/,@{$events}
+                                                    or grep /^MODIFIED.$name$/,@{$events}
+                                                    or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                    or grep /^ATTR.$name.disable.0$/,@{$events}
+                                                    or grep /^DELETEATTR.$name.interval$/,@{$events}
+                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events} ) and $init_done );
     return;
 }
 
@@ -284,6 +303,8 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     my $name        = $hash->{NAME};
 
+    
+    RemoveInternalTimer($hash);
     
     if( $init_done and not IsDisabled($name) ) {
         
@@ -393,6 +414,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         my $cmd;
         my $loop;
         my @gtResult;
+        $gtResult[0] = 'connect error';
         my $wait    = 1;
         my $sshHost = AttrVal($name,"sshHost","none");
         my $hci     = AttrVal($name,"hciDevice","hci0");
@@ -417,6 +439,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
+        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write');
         
         $loop = 0;
         do {
@@ -430,6 +453,9 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
         
+        $handle = '0x35' if($sshHost ne 'none' and $gattCmd eq 'write');
+        $gattCmd = 'read' if($sshHost ne 'none' and $gattCmd eq 'write');
+
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
         
@@ -642,7 +668,10 @@ sub XiaomiFlowerSens_ProcessingErrors($$) {
 sub XiaomiFlowerSens_encodeJSON($) {
 
     my $gtResult    = shift;
-
+    
+    
+    chomp($gtResult);
+    
     my %response = (
         'gtResult'      => $gtResult
     );
@@ -752,6 +781,7 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <b>Attributes</b>
   <ul>
     <li>disable - disables the device</li>
+    <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>interval - interval in seconds for statusRequest</li>
     <li>minFertility - min fertility value for low warn event</li>
     <li>maxFertility - max fertility value for High warn event</li>
@@ -765,6 +795,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
     Event Example for min/max Value's: 2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br>
     Event Example for min/max Value's: 2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high</li>
     <li>sshHost - FQD-Name or IP of ssh remote system / you must configure your ssh system for certificate authentication. For better handling you can config ssh Client with .ssh/config file</li>
+    <li>batteryFirmwareAge - how old can the reading befor fetch new data</li>
+    <li>blockingCallLoglevel - Blocking.pm Loglevel for BlockingCall Logoutput</li>
   </ul>
 </ul>
 
@@ -790,8 +822,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
       <code>define Weihnachtskaktus XiaomiFlowerSens C4:7C:8D:62:42:6F</code><br />
     </ul>
     <br />
-	Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
-	Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
+    Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
+    Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
   </ul>
   <br /><br />
   <a name="XiaomiFlowerSensreadings"></a>
@@ -826,6 +858,7 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <ul>
     <li>disable - deaktiviert das Device</li>
     <li>interval - Interval in Sekunden zwischen zwei Abfragen</li>
+    <li>disabledForIntervals - deaktiviert das Gerät für den angegebenen Zeitinterval (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>minFertility - min Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis minFertility low </li>
     <li>maxFertility - max Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis maxFertility high </li>
     <li>minMoisture - min Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis minMoisture low </li> 
@@ -838,7 +871,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
     2017-03-16 11:08:05 XiaomiFlowerSens Dracaena minMoisture low<br />
     2017-03-16 11:08:06 XiaomiFlowerSens Dracaena maxTemp high<br /><br /></li>
     <li>sshHost - FQDN oder IP-Adresse eines entfernten SSH-Systems. Das SSH-System ist auf eine Zertifikat basierte Authentifizierung zu konfigurieren. Am elegantesten geschieht das mit einer  .ssh/config Datei auf dem SSH-Client.</li>
-    <li>batteryFirmwareAge - how old can the reading befor fetch new data</li>
+    <li>batteryFirmwareAge - wie alt soll der Timestamp des Readings sein bevor eine Aktuallisierung statt findet</li>
+    <li>blockingCallLoglevel - Blocking.pm Loglevel für BlockingCall Logausgaben</li>
   </ul>
 </ul>
 
