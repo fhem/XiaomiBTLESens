@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.4.1";
+my $version = "1.4.1.1";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -414,7 +414,6 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         my $cmd;
         my $loop;
         my @gtResult;
-        $gtResult[0] = 'connect error';
         my $wait    = 1;
         my $sshHost = AttrVal($name,"sshHost","none");
         my $hci     = AttrVal($name,"hciDevice","hci0");
@@ -448,6 +447,9 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
             @gtResult = split(": ",qx($cmd));
             Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
+            
+            $gtResult[0] = 'connect error'
+            unless( defined($gtResult[0]) );
             
         } while( $loop < 5 and $gtResult[0] eq 'connect error' );
         
