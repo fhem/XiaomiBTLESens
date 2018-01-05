@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.4.1.1";
+my $version = "1.4.1";
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
