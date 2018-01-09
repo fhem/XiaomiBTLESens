@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.13";
+my $version = "1.99.16";
 
 
 
@@ -369,7 +369,7 @@ sub XiaomiBTLESens_WriteSensData($) {
     my $mac         = $hash->{BTMAC};
 
 
-    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|write|".$XiaomiModels{$attr{$name}{model}}{read}."|".$XiaomiModels{$attr{$name}{model}}{writeValue}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|write|".$XiaomiModels{$attr{$name}{model}}{write}."|".$XiaomiModels{$attr{$name}{model}}{writeValue}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - WriteSensData: call function ExecGatttool_Run";
 }
