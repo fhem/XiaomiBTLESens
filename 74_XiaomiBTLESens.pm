@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.16";
+my $version = "1.99.21";
 
 
 
@@ -279,7 +279,7 @@ sub XiaomiBTLESens_stateRequest($) {
         readingsSingleUpdate($hash,"state","set attribute model first",1);
         
     } elsif( !IsDisabled($name) ) {
-        if( ReadingsVal($name,'firmware','none') ne 'none') {
+        if( ReadingsVal($name,'firmware','none') ne 'none' or AttrVal($name,'model','none') eq 'thermoHygroSens') {
         
             return XiaomiBTLESens_CallBatteryFirmware($hash)
             if( XiaomiBTLESens_CallBatteryFirmware_IsUpdateTimeAgeToOld($hash,$CallBatteryFirmwareAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
