@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.29";
+my $version = "1.99.31";
 
 
 
@@ -682,7 +682,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     my $temp        = pack('H*',join(' ',substr($notification,4,8)));       # 31 37 2e 33
     my $hum         = pack('H*',join(' ',substr($notification,18,8)));      # 35 32 2e 35
 
-    $readings{'temperature'}    = $temp/10;
+    $readings{'temperature'}    = $temp;
     $readings{'humidity'}       = $hum;
         
     $hash->{helper}{CallBatteryFirmware} = 0;
