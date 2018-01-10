@@ -47,14 +47,14 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.26";
+my $version = "1.99.29";
 
 
 
 
 my %XiaomiModels = (
         flowerSens      => {'read' => '0x35'  ,'write' => '0x33'  ,'writeValue' => 'A01F' ,'battery' => '0x38'},
-        thermoHygroSens => {'read' => 'none'  ,'write' => '0x10'  ,'writeValue' => '100' ,'battery' => '0x18'},
+        thermoHygroSens => {'read' => 'none'  ,'write' => '0x10'  ,'writeValue' => '0100' ,'battery' => '0x18'},
     );
 
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
@@ -518,7 +518,7 @@ sub XiaomiBTLESens_ExecGatttool_Done($) {
     }
     
     
-    if( $respstate eq 'ok' and $gattCmd eq 'read' ) {
+    if( ($respstate eq 'ok' and $gattCmd eq 'read') or ($respstate eq 'ok' and $gattCmd eq 'write' and AttrVal($name,'model','none') eq 'thermoHygroSens') ) {
         XiaomiBTLESens_ProcessingNotification($hash,$handle,$decode_json->{gtResult});
         
     } elsif( $respstate eq 'ok' and $gattCmd eq 'write' and AttrVal($name,'model','none') ne 'thermoHygroSens' ) {
