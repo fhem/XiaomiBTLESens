@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.21";
+my $version = "1.99.26";
 
 
 
@@ -573,6 +573,13 @@ sub XiaomiBTLESens_ProcessingNotification($@) {
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18";
             
             $readings = XiaomiBTLESens_ThermoHygroSensHandle0x18($hash,$notification);
+        }
+        
+        if( $handle eq '0x10' ) {
+            ### Thermo/Hygro Sens - Read Sensor Data
+            Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x10";
+            
+            $readings = XiaomiBTLESens_ThermoHygroSensHandle0x10($hash,$notification);
         }
     }
     
