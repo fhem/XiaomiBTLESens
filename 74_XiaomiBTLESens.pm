@@ -362,6 +362,8 @@ sub XiaomiBTLESens_ReadFirmware($) {
 
     $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|read|".$XiaomiModels{$attr{$name}{model}}{firmware}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     
+    readingsSingleUpdate($hash,"state","fetch firmware data",1);
+    
     Log3 $name, 4, "XiaomiBTLESens ($name) - CallFirmware: call function ExecGatttool_Run";
 }
 
@@ -374,6 +376,8 @@ sub XiaomiBTLESens_ReadDeviceName($) {
 
 
     $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|read|".$XiaomiModels{$attr{$name}{model}}{devicename}, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+    
+    readingsSingleUpdate($hash,"state","fetch devicename data",1);
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - CallDeviceName: call function ExecGatttool_Run";
 }
@@ -414,6 +418,8 @@ sub XiaomiBTLESens_WriteDeviceName($$) {
 
     $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|write|".$XiaomiModels{$attr{$name}{model}}{devicename}."|".$value, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     
+    readingsSingleUpdate($hash,"state","write devicename data",1);
+    
     Log3 $name, 4, "XiaomiBTLESens ($name) - WriteDeviceName: call function ExecGatttool_Run";
 }
 
@@ -449,8 +455,19 @@ sub XiaomiBTLESens_Get($$@) {
     
         XiaomiBTLESens_stateRequest($hash);
         
+    } elsif( $cmd eq 'firmware' ) {
+        return "usage: firmware" if( @args != 0 );
+    
+        XiaomiBTLESens_ReadFirmware($hash);
+        
+    } elsif( $cmd eq 'devicename' ) {
+        return "usage: devicename" if( @args != 0 );
+    
+        XiaomiBTLESens_ReadDeviceName($hash);
+        
     } else {
-        my $list = "sensorData:noArg";
+        my $list = "sensorData:noArg firmware:noArg";
+            $list .= " devicename:noArg" if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );
         return "Unknown argument $cmd, choose one of $list";
     }
     
@@ -469,6 +486,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
     $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
     $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
+    $gatttool                               = "ssh $sshHost \'$gatttool\'" if($sshHost ne 'none');
     
     if(-x $gatttool) {
     
