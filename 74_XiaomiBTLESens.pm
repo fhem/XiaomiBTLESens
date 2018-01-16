@@ -607,7 +607,7 @@ sub XiaomiBTLESens_ProcessingNotification($@) {
             ### Thermo/Hygro Sens - Read and Write Devicename
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3";
         
-            return unless($gattCmd eq 'read');
+            return readingsSingleUpdate($hash,"state","active",1) unless($gattCmd eq 'read');
             $readings = XiaomiBTLESens_ThermoHygroSensHandle0x3($hash,$notification)
         }
     }
