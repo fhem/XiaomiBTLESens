@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.40";
+my $version = "1.99.41";
 
 
 
@@ -349,7 +349,7 @@ sub XiaomiBTLESens_Set($$@) {
         return "usage: devicename <name>" if( @args < 1 );
 
         my $devicename = join( " ", @args );
-        $handle = $XiaomiModels{$attr{$name}{model}}{devicename}; $value = XiaomiBTLESens_CreateDevicenameHEX(makeDeviceName($devicename));
+        $mod = 'write'; $handle = $XiaomiModels{$attr{$name}{model}}{devicename}; $value = XiaomiBTLESens_CreateDevicenameHEX(makeDeviceName($devicename));
     
     } else {
         my $list = "";
