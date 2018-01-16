@@ -305,6 +305,7 @@ sub XiaomiBTLESens_stateRequest($) {
 
             XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{$attr{$name}{model}}{firmware});
             #InternalTimer( gettimeofday() + 120, "XiaomiBTLESens_ReadDeviceName", $hash ) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );  # hier muss ich noch mal schauen wegen der Umstellung
+            InternalTimer( gettimeofday() + 120, "XiaomiBTLESens_CreateParamGatttool", $hash.',read,'.$XiaomiModels{$attr{$name}{model}}{devicename} ) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );
         }
 
     } else {
