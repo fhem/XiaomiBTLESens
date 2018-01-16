@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.99.43";
+my $version = "2.0.0";
 
 
 
@@ -157,7 +157,7 @@ sub XiaomiBTLESens_Define($$) {
     $hash->{INTERVAL}                       = 300;
     $hash->{helper}{CallSensDataCounter}    = 0;
     $hash->{helper}{CallBattery}            = 0;
-    $hash->{NOTIFYDEV}                      = "global";
+    $hash->{NOTIFYDEV}                      = "global,$name";
     $hash->{loglevel}                       = 4;
         
     
@@ -270,7 +270,13 @@ sub XiaomiBTLESens_Notify($$) {
                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
                                                     or grep /^DELETEATTR.$name.model$/,@{$events}
                                                     or grep /^ATTR.$name.model.+/,@{$events}
-                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events} ) and $init_done );
+                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events} ) and $init_done and $devname eq 'global' );
+
+
+    XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' 
+                                                                                                                and $devname eq $name
+                                                                                                                and grep /^$name.firmware.+/,@{$events} );
+
     return;
 }
 
@@ -304,8 +310,6 @@ sub XiaomiBTLESens_stateRequest($) {
         } else {
 
             XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{firmware});
-            #InternalTimer( gettimeofday() + 120, "XiaomiBTLESens_ReadDeviceName", $hash ) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );  # hier muss ich noch mal schauen wegen der Umstellung
-            InternalTimer( gettimeofday() + 120, "XiaomiBTLESens_CreateParamGatttool", $hash.',read,'.$XiaomiModels{AttrVal($name,'model','')}{devicename} ) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );
         }
 
     } else {
@@ -432,6 +436,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
     my ($name,$mac,$gattCmd,$handle,$value) = split("\\|", $string);
     my $sshHost                             = AttrVal($name,"sshHost","none");
     my $gatttool;
+    my $json_notification;
 
 
     $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
@@ -492,7 +497,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
         
-        my $json_notification = XiaomiBTLESens_encodeJSON($gtResult[1]);
+        $json_notification = XiaomiBTLESens_encodeJSON($gtResult[1]);
         
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
@@ -506,7 +511,8 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
             return "$name|$mac|error|$gattCmd|$handle|$json_notification";
         }
     } else {
-        return "$name|$mac|error|$gattCmd|$handle|no gatttool binary found. Please check if bluez-package is properly installed";
+        $json_notification = XiaomiBTLESens_encodeJSON('no gatttool binary found. Please check if bluez-package is properly installed');
+        return "$name|$mac|error|$gattCmd|$handle|$json_notification";
     }
 }
 
