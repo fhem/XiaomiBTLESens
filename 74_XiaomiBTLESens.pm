@@ -442,7 +442,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
     $gatttool                               = qx(which gatttool) if($sshHost eq 'none');
     $gatttool                               = qx(ssh $sshHost 'which gatttool') if($sshHost ne 'none');
     chomp $gatttool;
-    $gatttool                               = "ssh $sshHost \'$gatttool\'" if($sshHost ne 'none');
+    Log3 $name, 3, "XiaomiBTLESens ($name) - Gatttool ist: $gatttool";
     
     if(-x $gatttool) {
     
