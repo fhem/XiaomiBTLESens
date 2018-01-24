@@ -300,8 +300,8 @@ sub XiaomiBTLESens_stateRequest($) {
             if( XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($hash,$CallBatteryAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
 
             if( $hash->{helper}{CallSensDataCounter} < 1 ) {
-                XiaomiBTLESens_CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
-                $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
+                    XiaomiBTLESens_CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
+                    $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
                 
             } else {
                 $readings{'lastGattError'} = 'charWrite faild';
@@ -677,7 +677,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     
     Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
     
-    chomp($notification));
+    chomp($notification);
         
     $readings{'batteryLevel'}   = hex("0x".$notification);
     $readings{'battery'}        = (hex("0x".$notification) > 20?"ok":"low");
