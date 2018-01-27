@@ -409,18 +409,18 @@ sub XiaomiBTLESens_CreateParamGatttool($@) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Run CreateParamGatttool with mod: $mod";
     
      if( $mod eq 'read' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","read sensor data",1);
     
-        Log3 $name, 4, "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle";
+        Log3 $name, 5, "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle";
 
      } elsif( $mod eq 'write' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value, "XiaomiBTLESens_ExecGatttool_Done", 60, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","write sensor data",1);
     
-        Log3 $name, 4, "XiaomiBTLESens ($name) - Write XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle|$value";
+        Log3 $name, 5, "XiaomiBTLESens ($name) - Write XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle|$value";
     }
 }
 
@@ -454,7 +454,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
             $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hci -b $mac" | grep -v grep') if($sshHost ne 'none');
 
             if(not $grepGatttool =~ /^\s*$/) {
-                Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
+                Log3 $name, 3, "XiaomiBTLESens ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
                 sleep(1);
             } else {
                 $wait = 0;
@@ -465,7 +465,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         $cmd .= "gatttool -i $hci -b $mac ";
         $cmd .= "--char-read -a $handle" if($gattCmd eq 'read');
         $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
-        $cmd = "timeout 5 ".$cmd." --listen" if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+        $cmd = "timeout 10 ".$cmd." --listen" if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
         $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write' and AttrVal($name,"model","none") eq 'flowerSens');
@@ -523,11 +523,11 @@ sub XiaomiBTLESens_ExecGatttool_Done($) {
     Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Done: Helper is disabled. Stop processing" if($hash->{helper}{DISABLED});
     return if($hash->{helper}{DISABLED});
     
-    Log3 $name, 4, "XiaomiBTLESens ($name) - ExecGatttool_Done: gatttool return string: $string";
+    Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Done: gatttool return string: $string";
     
     my $decode_json =   eval{decode_json($json_notification)};
     if($@){
-        Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Done: JSON error while request: $@";
+        Log3 $name, 4, "XiaomiBTLESens ($name) - ExecGatttool_Done: JSON error while request: $@";
     }
     
     
@@ -565,7 +565,7 @@ sub XiaomiBTLESens_ProcessingNotification($@) {
     my $readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - ProcessingNotification";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification";
     
     if( AttrVal($name,'model','none') eq 'flowerSens' ) {
         if( $handle eq '0x38' ) {
@@ -624,7 +624,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - FlowerSens Handle0x38";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x38";
 
     my @dataBatFw   = split(" ",$notification);
 
@@ -645,7 +645,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - FlowerSens Handle0x35";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x35";
     
     my @dataSensor  = split(" ",$notification);
 
@@ -675,7 +675,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x18";
     
     chomp($notification);
         
@@ -695,7 +695,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
 
     $notification =~ s/\s+//g;
 
@@ -714,7 +714,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x24($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x24";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x24";
 
     $notification =~ s/\s+//g;
 
@@ -732,7 +732,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x3($$) {
     my %readings;
     
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x3";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x3";
 
     $notification =~ s/\s+//g;
 
@@ -794,7 +794,7 @@ sub XiaomiBTLESens_ProcessingErrors($$) {
     my $name                    = $hash->{NAME};
     my %readings;
     
-    Log3 $name, 5, "XiaomiBTLESens ($name) - ProcessingErrors";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingErrors";
     $readings{'lastGattError'} = $notification;
     
     XiaomiBTLESens_WriteReadings($hash,\%readings);
