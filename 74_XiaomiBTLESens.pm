@@ -479,7 +479,8 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
             
-            $gtResult[1] = split("\n",$gtResult[1]) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            ($gtResult[1]) = split("\n",$gtResult[1]) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            $gtResult[1] =~ s/\\n//g if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
             
             $gtResult[0] = 'connect error'
             unless( defined($gtResult[0]) );
