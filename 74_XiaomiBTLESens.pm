@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.6debug7";
+my $version = "2.0.6debug10";
 
 
 
@@ -474,10 +474,12 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         do {
             
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command $cmd and loop $loop";
-            @gtResult = split(": ",qx($cmd)) unless( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            @gtResult = split(",",qx($cmd)) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            @gtResult = split(": ",qx($cmd)); # unless( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            #@gtResult = split(",",qx($cmd)) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
+            
+            $gtResult[1] = split("\n",$gtResult[1]) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
             
             $gtResult[0] = 'connect error'
             unless( defined($gtResult[0]) );
