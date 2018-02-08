@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.6debug10";
+my $version = "2.0.7";
 
 
 
@@ -658,7 +658,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
         
     if( $dataSensor[1] eq "ff" ) {
-        $readings{'temperature'}    = hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff") / 10;
+        $readings{'temperature'}    = (hex("0x".$dataSensor[1].$dataSensor[0]) - hex("0xffff")) / 10;
     } else {
         $readings{'temperature'}    = hex("0x".$dataSensor[1].$dataSensor[0]) / 10;
     }
