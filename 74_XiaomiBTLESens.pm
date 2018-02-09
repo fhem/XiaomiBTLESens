@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.7";
+my $version = "2.0.8";
 
 
 
@@ -57,7 +57,7 @@ my %XiaomiModels = (
         thermoHygroSens => {'wdata' => '0x10'  ,'wdataValue' => '0100' ,'battery' => '0x18' ,'firmware' => '0x24' ,'devicename' => '0x3'},
     );
 
-my %CallBatteryAge = (  '8h'    => 28800,
+my %CallBatteryAge = (          '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
                                 '32h'   => 115200,
@@ -467,7 +467,12 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
-        $cmd = "ssh $sshHost 'timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null'" if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+        
+        
+        $cmd = "ssh $sshHost 'timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null'" if( $sshHost ne 'none' and AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+        $cmd = "timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null" if( $sshHost eq 'none' and AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+        
+        
         $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write' and AttrVal($name,"model","none") eq 'flowerSens');
         
         $loop = 0;
