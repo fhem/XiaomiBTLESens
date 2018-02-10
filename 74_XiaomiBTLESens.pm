@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.8pri2";
+my $version = "2.0.8";
 
 
 
@@ -223,9 +223,9 @@ sub XiaomiBTLESens_Attr(@) {
         RemoveInternalTimer($hash);
         
         if( $cmd eq "set" ) {
-            if( $attrVal < 300 ) {
-                Log3 $name, 3, "XiaomiBTLESens ($name) - interval too small, please use something >= 300 (sec), default is 3600 (sec)";
-                return "interval too small, please use something >= 300 (sec), default is 3600 (sec)";
+            if( $attrVal < 120 ) {
+                Log3 $name, 3, "XiaomiBTLESens ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)";
+                return "interval too small, please use something >= 120 (sec), default is 300 (sec)";
             } else {
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3, "XiaomiBTLESens ($name) - set interval to $attrVal";
@@ -329,7 +329,7 @@ sub XiaomiBTLESens_stateRequestTimer($) {
 
     XiaomiBTLESens_stateRequest($hash) if( $init_done );
 
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(600)), "XiaomiBTLESens_stateRequestTimer", $hash );
+    InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(90)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
 }
