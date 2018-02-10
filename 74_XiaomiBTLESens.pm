@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.8pri1";
+my $version = "2.0.8pri2";
 
 
 
@@ -475,19 +475,17 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
 
         $loop = 0;
         do {
+
+            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command: $cmd and loop $loop";
             
-            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command - $cmd and loop - $loop";
-            @gtResult = split(": ",qx($cmd)); # unless( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            #@gtResult = split(",",qx($cmd)) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
+            @gtResult = split(": ",qx($cmd));
+
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
-            
-            ($gtResult[1]) = split("\n",$gtResult[1]) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            $gtResult[1] =~ s/\\n//g if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-            
+
             $gtResult[0] = 'connect error'
             unless( defined($gtResult[0]) );
-            
+
         } while( $loop < 5 and $gtResult[0] eq 'connect error' );
         
         Log3 $name, 4, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
@@ -497,7 +495,12 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
 
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
-        
+
+        if( $gtResult[1] ne 'no data response' and $listen ) {
+            ($gtResult[1]) = split("\n",$gtResult[1]);
+            $gtResult[1] =~ s/\\n//g;
+        }
+
         $json_notification = XiaomiBTLESens_encodeJSON($gtResult[1]);
         
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
@@ -712,9 +715,9 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     $readings{'temperature'}    = pack('H*',substr($notification,4,8));
     
     if( scalar(@numberOfHex) < 14 ) {
-        $readings{'humidity'}       = pack('H*',substr($notification,18,8));
-    } else {
         $readings{'humidity'}       = pack('H*',substr($notification,16,8));
+    } else {
+        $readings{'humidity'}       = pack('H*',substr($notification,18,8));
     }
 
     $hash->{helper}{CallBattery} = 0;
