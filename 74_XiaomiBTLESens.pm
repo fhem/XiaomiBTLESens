@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.8";
+my $version = "2.0.8pri1";
 
 
 
@@ -455,10 +455,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         $cmd                                        .= " --listen" if($listen);
         $cmd                                        .= " 2>&1 /dev/null";
         $cmd                                        .= "'" if($sshHost ne 'none');
-        
-        #$cmd = "ssh $sshHost 'timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null'" if( $sshHost ne 'none' and AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-        #$cmd = "timeout 5 gatttool -i $hci -b $mac --char-write-req -a $handle -n $value --listen 2>&1 /dev/null" if( $sshHost eq 'none' and AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
-        
+
         $cmd                                        = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write' and AttrVal($name,"model","none") eq 'flowerSens');
         
         
@@ -479,7 +476,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         $loop = 0;
         do {
             
-            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command $cmd and loop $loop";
+            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command - $cmd and loop - $loop";
             @gtResult = split(": ",qx($cmd)); # unless( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
             #@gtResult = split(",",qx($cmd)) if( AttrVal($name,"model","none") eq 'thermoHygroSens' and $gattCmd eq 'write' and $handle eq '0x10');
             Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
@@ -706,12 +703,20 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
+    
+    my @numberOfHex = split(' ',$notification);
 
     $notification =~ s/\s+//g;
 
+    
     $readings{'temperature'}    = pack('H*',substr($notification,4,8));
-    $readings{'humidity'}       = pack('H*',substr($notification,18,8));
-        
+    
+    if( scalar(@numberOfHex) < 14 ) {
+        $readings{'humidity'}       = pack('H*',substr($notification,18,8));
+    } else {
+        $readings{'humidity'}       = pack('H*',substr($notification,16,8));
+    }
+
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
 }
