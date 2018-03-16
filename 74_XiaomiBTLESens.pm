@@ -47,7 +47,7 @@ use JSON;
 use Blocking;
 
 
-my $version = "2.0.9";
+my $version = "2.0.11";
 
 
 
@@ -86,6 +86,7 @@ sub XiaomiBTLESens_ProcessingNotification($@);
 sub XiaomiBTLESens_WriteReadings($$);
 sub XiaomiBTLESens_ProcessingErrors($$);
 sub XiaomiBTLESens_encodeJSON($);
+sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($);
 
 sub XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($$);
 sub XiaomiBTLESens_CallBattery_Timestamp($);
@@ -162,7 +163,8 @@ sub XiaomiBTLESens_Define($$) {
         
     
     readingsSingleUpdate($hash,"state","initialized", 0);
-    $attr{$name}{room}                      = "XiaomiBTLESens" if( AttrVal($name,'room','none') eq 'none' );
+    #$attr{$name}{room}                      = "XiaomiBTLESens" if( AttrVal($name,'room','none') eq 'none' );
+    CommandAttr(undef,$name . ' room XiaomiBTLESens') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "XiaomiBTLESens ($name) - defined with BTMAC $hash->{BTMAC}";
     
@@ -462,8 +464,11 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         while($wait) {
         
             my $grepGatttool;
-            $grepGatttool = qx(ps ax| grep -E \'gatttool -i $hci -b $mac\' | grep -v grep) if($sshHost eq 'none');
-            $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hci -b $mac" | grep -v grep') if($sshHost ne 'none');
+            my $gatttoolCmdlineStaticEscaped = CometBlueBTLE_CmdlinePreventGrepFalsePositive("gatttool -i $hci -b $mac");
+            #$grepGatttool = qx(ps ax| grep -E \'gatttool -i $hci -b $mac\' | grep -v grep) if($sshHost eq 'none');
+            #$grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "gatttool -i $hci -b $mac" | grep -v grep') if($sshHost ne 'none');
+            $grepGatttool = qx(ps ax| grep -E \'$gatttoolCmdlineStaticEscaped\') if($sshHost eq 'none');
+            $grepGatttool = qx(ssh $sshHost 'ps ax| grep -E "$gatttoolCmdlineStaticEscaped"') if($sshHost ne 'none');
 
             if(not $grepGatttool =~ /^\s*$/) {
                 Log3 $name, 3, "XiaomiBTLESens ($name) - ExecGatttool_Run: another gatttool process is running. waiting...";
@@ -639,7 +644,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
     my @dataBatFw   = split(" ",$notification);
 
     $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
-    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 20?"ok":"low");
+    $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 19 ? "ok" : "low");
     $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
@@ -690,7 +695,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     chomp($notification);
         
     $readings{'batteryLevel'}   = hex("0x".$notification);
-    $readings{'battery'}        = (hex("0x".$notification) > 20?"ok":"low");
+    $readings{'battery'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
         
     $hash->{helper}{CallBattery} = 1;
     XiaomiBTLESens_CallBattery_Timestamp($hash);
@@ -875,6 +880,22 @@ sub XiaomiBTLESens_CreateDevicenameHEX($) {
 
     return $devicenameHex;
 }
+
+sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
+# https://stackoverflow.com/questions/9375711/more-elegant-ps-aux-grep-v-grep
+# Given abysmal (since external-command-based) performance in the first place, we'd better
+# avoid an *additional* grep process plus pipe...
+
+    my $cmdline = shift;
+
+  
+    $cmdline =~ s/(.)(.*)/[$1]$2/;
+    return $cmdline;
+}
+
+
+
+
 
 
 
