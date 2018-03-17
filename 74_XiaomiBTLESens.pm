@@ -39,15 +39,18 @@
 
 package main;
 
+my $missingModul = "";
+
 use strict;
 use warnings;
 use POSIX;
 
-use JSON;
-use Blocking;
+eval "use JSON;1" or $missingModul .= "JSON ";
+eval "use Blocking;1" or $missingModul .= "Blocking ";
+#use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.11";
+my $version = "2.0.10";
 
 
 
@@ -148,6 +151,7 @@ sub XiaomiBTLESens_Define($$) {
     my @a = split( "[ \t][ \t]*", $def );
     
     return "too few parameters: define <name> XiaomiBTLESens <BTMAC>" if( @a != 3 );
+    return "Cannot define XiaomiBTLESens device. Perl modul ${missingModul}is missing." if ( $missingModul );
     
 
     my $name                                = $a[0];
@@ -267,7 +271,7 @@ sub XiaomiBTLESens_Notify($$) {
     return if (!$events);
 
 
-    XiaomiBTLESens_stateRequestTimer($hash) if( (grep /^DEFINED.$name$/,@{$events}
+    XiaomiBTLESens_stateRequestTimer($hash) if( (((grep /^DEFINED.$name$/,@{$events}
                                                     or grep /^INITIALIZED$/,@{$events}
                                                     or grep /^MODIFIED.$name$/,@{$events}
                                                     or grep /^DELETEATTR.$name.disable$/,@{$events}
@@ -275,8 +279,9 @@ sub XiaomiBTLESens_Notify($$) {
                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
                                                     or grep /^DELETEATTR.$name.model$/,@{$events}
                                                     or grep /^ATTR.$name.model.+/,@{$events}
-                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events} ) and $init_done and $devname eq 'global' );
-
+                                                    or grep /resetBatteryTimestamp$/,@{$events}
+                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events}) and $devname eq 'global')
+                                                    or grep /^resetBatteryTimestamp$/,@{$events}) and $init_done  );
 
     XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' 
                                                                                                                 and $devname eq $name
@@ -351,10 +356,16 @@ sub XiaomiBTLESens_Set($$@) {
 
         my $devicename = join( " ", @args );
         $mod = 'write'; $handle = $XiaomiModels{AttrVal($name,'model','')}{devicename}; $value = XiaomiBTLESens_CreateDevicenameHEX(makeDeviceName($devicename));
+        
+    } elsif( $cmd eq 'resetBatteryTimestamp' ) {
+        return "usage: resetBatteryTimestamp" if( @args != 0 );
+        
+        $hash->{helper}{updateTimeCallBattery}  = 0;
+        return;
     
     } else {
-        my $list = "";
-        $list .= "devicename" if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );
+        my $list = "resetBatteryTimestamp:noArg";
+        $list .= " devicename" if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' );
         
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -955,6 +966,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   <b>Set</b>
   <ul>
     <li>devicename - set a devicename</li>
+    <li>resetBatteryTimestamp - when the battery was changed</li>
     <br>
   </ul>
   <br><br>
@@ -1040,6 +1052,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   <b>Get</b>
   <ul>
     <li>devicename - setzt einen Devicenamen</li>
+    <li>resetBatteryTimestamp - wenn die Batterie gewechselt wurde</li>
     <br />
   </ul>
   <br /><br />
