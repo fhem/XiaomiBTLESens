@@ -50,7 +50,7 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 
-my $version = "2.0.12";
+my $version = "2.0.13";
 
 
 
@@ -273,6 +273,7 @@ sub XiaomiBTLESens_Notify($$) {
 
     XiaomiBTLESens_stateRequestTimer($hash) if( (((grep /^DEFINED.$name$/,@{$events}
                                                     or grep /^INITIALIZED$/,@{$events}
+                                                    or grep /^REREADCFG$/,@{$events}
                                                     or grep /^MODIFIED.$name$/,@{$events}
                                                     or grep /^DELETEATTR.$name.disable$/,@{$events}
                                                     or grep /^ATTR.$name.disable.0$/,@{$events}
