@@ -170,6 +170,7 @@ sub XiaomiBTLESens_Define($$) {
     CommandAttr(undef,$name . ' room XiaomiBTLESens') if( AttrVal($name,'room','none') eq 'none' );
     
     Log3 $name, 3, "XiaomiBTLESens ($name) - defined with BTMAC $hash->{BTMAC}";
+    Log3 $name, 1, "XiaomiBTLESens ($name) - readings battery and batteryLevel a deprecated and will be remove in future";
     
     $modules{XiaomiBTLESens}{defptr}{$hash->{BTMAC}} = $hash;
     return undef;
@@ -657,6 +658,10 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
 
     $readings{'batteryLevel'}   = hex("0x".$dataBatFw[0]);
     $readings{'battery'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
+    ### neue Vereinheitlichung für Batteriereadings Forum #800017
+    $readings{'batteryPercent'}   = hex("0x".$dataBatFw[0]);
+    $readings{'batteryState'}        = (hex("0x".$dataBatFw[0]) > 15 ? "ok" : "low");
+    
     $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
