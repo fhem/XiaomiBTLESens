@@ -801,7 +801,7 @@ sub XiaomiBTLESens_WriteReadings($$) {
     }
 
     readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'active')) if( AttrVal($name,'model','none') eq 'flowerSens' );
-    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'T: '.ReadingsVal($name,'temperature',0).' H: '.ReadingsVal($name,'humidity',0) ) if( AttrVal($name,'model','none') eq 'thermoHygroSens' );
+    readingsBulkUpdateIfChanged($hash, "state", ($readings->{'lastGattError'}?'error':'T: '.ReadingsVal($name,'temperature',0).' H: '.ReadingsVal($name,'humidity',0)) ) if( AttrVal($name,'model','none') eq 'thermoHygroSens' );
     
     readingsEndUpdate($hash,1);
 
