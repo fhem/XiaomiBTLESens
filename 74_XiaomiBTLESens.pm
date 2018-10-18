@@ -39,86 +39,23 @@
 
 package main;
 
-my $missingModul = "";
 
 use strict;
 use warnings;
-use POSIX;
 
-eval "use JSON;1" or $missingModul .= "JSON ";
-eval "use Blocking;1" or $missingModul .= "Blocking ";
-#use Data::Dumper;          only for Debugging
-
-
-my $version = "2.2.2";
-
-
-
-
-my %XiaomiModels = (
-        flowerSens      => {'rdata' => '0x35' ,'wdata' => '0x33' ,'wdataValue' => 'A01F' ,'wdatalisten' => 0 ,'battery' => '0x38' ,'firmware' => '0x38'},
-        thermoHygroSens => {'wdata' => '0x10' ,'wdataValue' => '0100' ,'wdatalisten' => 1 ,'battery' => '0x18' ,'firmware' => '0x24' ,'devicename' => '0x3'},
-    );
-
-my %CallBatteryAge = (          '8h'    => 28800,
-                                '16h'   => 57600,
-                                '24h'   => 86400,
-                                '32h'   => 115200,
-                                '40h'   => 144000,
-                                '48h'   => 172800
-    );
-
-
-# Declare functions
-sub XiaomiBTLESens_Initialize($);
-sub XiaomiBTLESens_Define($$);
-sub XiaomiBTLESens_Undef($$);
-sub XiaomiBTLESens_Attr(@);
-sub XiaomiBTLESens_stateRequest($);
-sub XiaomiBTLESens_stateRequestTimer($);
-sub XiaomiBTLESens_Set($$@);
-sub XiaomiBTLESens_Get($$@);
-sub XiaomiBTLESens_Notify($$);
-
-sub XiaomiBTLESens_CreateParamGatttool($@);
-
-sub XiaomiBTLESens_ExecGatttool_Run($);
-sub XiaomiBTLESens_ExecGatttool_Done($);
-sub XiaomiBTLESens_ExecGatttool_Aborted($);
-sub XiaomiBTLESens_ProcessingNotification($@);
-sub XiaomiBTLESens_WriteReadings($$);
-sub XiaomiBTLESens_ProcessingErrors($$);
-sub XiaomiBTLESens_encodeJSON($);
-sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($);
-
-sub XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($$);
-sub XiaomiBTLESens_CallBattery_Timestamp($);
-sub XiaomiBTLESens_CallBattery_UpdateTimeAge($);
-sub XiaomiBTLESens_CreateDevicenameHEX($);
-
-sub XiaomiBTLESens_FlowerSensHandle0x35($$);
-sub XiaomiBTLESens_FlowerSensHandle0x38($$);
-sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$);
-sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$);
-sub XiaomiBTLESens_ThermoHygroSensHandle0x24($$);
-sub XiaomiBTLESens_ThermoHygroSensHandle0x3($$);
-
-
-
-
-
+my $version = "2.4.0";
 
 
 sub XiaomiBTLESens_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}      = "XiaomiBTLESens_Set";
-    $hash->{GetFn}      = "XiaomiBTLESens_Get";
-    $hash->{DefFn}      = "XiaomiBTLESens_Define";
-    $hash->{NotifyFn}   = "XiaomiBTLESens_Notify";
-    $hash->{UndefFn}    = "XiaomiBTLESens_Undef";
-    $hash->{AttrFn}     = "XiaomiBTLESens_Attr";
+    $hash->{SetFn}      = "XiaomiBTLESens::Set";
+    $hash->{GetFn}      = "XiaomiBTLESens::Get";
+    $hash->{DefFn}      = "XiaomiBTLESens::Define";
+    $hash->{NotifyFn}   = "XiaomiBTLESens::Notify";
+    $hash->{UndefFn}    = "XiaomiBTLESens::Undef";
+    $hash->{AttrFn}     = "XiaomiBTLESens::Attr";
     $hash->{AttrList}   = "interval ".
                             "disable:1 ".
                             "disabledForIntervals ".
@@ -145,7 +82,64 @@ sub XiaomiBTLESens_Initialize($) {
     }
 }
 
-sub XiaomiBTLESens_Define($$) {
+package XiaomiBTLESens;
+
+my $missingModul = "";
+
+use strict;
+use warnings;
+use POSIX;
+
+use GPUtils qw(:all)
+  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+eval "use JSON;1" or $missingModul .= "JSON ";
+eval "use Blocking;1" or $missingModul .= "Blocking ";
+#use Data::Dumper;          only for Debugging
+
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(
+        qw(readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsEndUpdate
+          defs
+          modules
+          Log3
+          CommandAttr
+          attr
+          AttrVal
+          ReadingsVal
+          IsDisabled
+          deviceEvents
+          init_done
+          gettimeofday
+          InternalTimer
+          RemoveInternalTimer
+          DoTrigger
+          BlockingKill
+          BlockingCall)
+    );
+}
+
+my %XiaomiModels = (
+        flowerSens      => {'rdata' => '0x35' ,'wdata' => '0x33' ,'wdataValue' => 'A01F' ,'wdatalisten' => 0 ,'battery' => '0x38' ,'firmware' => '0x38'},
+        thermoHygroSens => {'wdata' => '0x10' ,'wdataValue' => '0100' ,'wdatalisten' => 1 ,'battery' => '0x18' ,'firmware' => '0x24' ,'devicename' => '0x3'},
+    );
+
+my %CallBatteryAge = (          '8h'    => 28800,
+                                '16h'   => 57600,
+                                '24h'   => 86400,
+                                '32h'   => 115200,
+                                '40h'   => 144000,
+                                '48h'   => 172800
+    );
+    
+
+
+sub Define($$) {
 
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
@@ -175,7 +169,7 @@ sub XiaomiBTLESens_Define($$) {
     return undef;
 }
 
-sub XiaomiBTLESens_Undef($$) {
+sub Undef($$) {
 
     my ( $hash, $arg ) = @_;
     
@@ -191,7 +185,7 @@ sub XiaomiBTLESens_Undef($$) {
     return undef;
 }
 
-sub XiaomiBTLESens_Attr(@) {
+sub Attr(@) {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash                                = $defs{$name};
@@ -258,11 +252,11 @@ sub XiaomiBTLESens_Attr(@) {
     return undef;
 }
 
-sub XiaomiBTLESens_Notify($$) {
+sub Notify($$) {
 
     my ($hash,$dev) = @_;
     my $name = $hash->{NAME};
-    return if (IsDisabled($name));
+    return stateRequestTimer($hash) if (IsDisabled($name));
     
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
@@ -270,7 +264,7 @@ sub XiaomiBTLESens_Notify($$) {
     return if (!$events);
 
 
-    XiaomiBTLESens_stateRequestTimer($hash) if( (((grep /^DEFINED.$name$/,@{$events}
+    stateRequestTimer($hash) if( (((grep /^DEFINED.$name$/,@{$events}
                                                     or grep /^DELETEATTR.$name.disable$/,@{$events}
                                                     or grep /^ATTR.$name.disable.0$/,@{$events}
                                                     or grep /^DELETEATTR.$name.interval$/,@{$events}
@@ -282,14 +276,14 @@ sub XiaomiBTLESens_Notify($$) {
                                                     or grep /^REREADCFG$/,@{$events}
                                                     or grep /^MODIFIED.$name$/,@{$events}) and $devname eq 'global') );
 
-    XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' 
+    CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) if( AttrVal($name,'model','thermoHygroSens') eq 'thermoHygroSens' 
                                                                                                                 and $devname eq $name
                                                                                                                 and grep /^$name.firmware.+/,@{$events} );
 
     return;
 }
 
-sub XiaomiBTLESens_stateRequest($) {
+sub stateRequest($) {
 
     my ($hash)      = @_;
     my $name        = $hash->{NAME};
@@ -302,23 +296,23 @@ sub XiaomiBTLESens_stateRequest($) {
     } elsif( !IsDisabled($name) ) {
         if( ReadingsVal($name,'firmware','none') ne 'none' ) {
 
-            return XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{battery})
-            if( XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($hash,$CallBatteryAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
+            return CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{battery})
+            if( CallBattery_IsUpdateTimeAgeToOld($hash,$CallBatteryAge{AttrVal($name,'BatteryFirmwareAge','24h')}) );
 
             if( $hash->{helper}{CallSensDataCounter} < 1 ) {
-                    XiaomiBTLESens_CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
+                    CreateParamGatttool($hash,'write',$XiaomiModels{AttrVal($name,'model','')}{wdata},$XiaomiModels{AttrVal($name,'model','')}{wdataValue});
                     $hash->{helper}{CallSensDataCounter} = $hash->{helper}{CallSensDataCounter} + 1;
                 
             } else {
                 $readings{'lastGattError'} = 'charWrite faild';
-                XiaomiBTLESens_WriteReadings($hash,\%readings);
+                WriteReadings($hash,\%readings);
                 $hash->{helper}{CallSensDataCounter} = 0;
                 return;
             }
             
         } else {
 
-            XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{firmware});
+            CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{firmware});
         }
 
     } else {
@@ -326,7 +320,7 @@ sub XiaomiBTLESens_stateRequest($) {
     }
 }
 
-sub XiaomiBTLESens_stateRequestTimer($) {
+sub stateRequestTimer($) {
 
     my ($hash)      = @_;
     
@@ -334,14 +328,14 @@ sub XiaomiBTLESens_stateRequestTimer($) {
 
 
     RemoveInternalTimer($hash);
-    XiaomiBTLESens_stateRequest($hash);
+    stateRequest($hash);
 
     InternalTimer( gettimeofday()+$hash->{INTERVAL}+int(rand(300)), "XiaomiBTLESens_stateRequestTimer", $hash );
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
 }
 
-sub XiaomiBTLESens_Set($$@) {
+sub Set($$@) {
     
     my ($hash, $name, @aa)  = @_;
     my ($cmd, @args)        = @aa;
@@ -355,7 +349,7 @@ sub XiaomiBTLESens_Set($$@) {
         return "usage: devicename <name>" if( @args < 1 );
 
         my $devicename = join( " ", @args );
-        $mod = 'write'; $handle = $XiaomiModels{AttrVal($name,'model','')}{devicename}; $value = XiaomiBTLESens_CreateDevicenameHEX(makeDeviceName($devicename));
+        $mod = 'write'; $handle = $XiaomiModels{AttrVal($name,'model','')}{devicename}; $value = CreateDevicenameHEX(makeDeviceName($devicename));
         
     } elsif( $cmd eq 'resetBatteryTimestamp' ) {
         return "usage: resetBatteryTimestamp" if( @args != 0 );
@@ -371,12 +365,12 @@ sub XiaomiBTLESens_Set($$@) {
     }
     
     
-    XiaomiBTLESens_CreateParamGatttool($hash,$mod,$handle,$value);
+    CreateParamGatttool($hash,$mod,$handle,$value);
     
     return undef;
 }
 
-sub XiaomiBTLESens_Get($$@) {
+sub Get($$@) {
     
     my ($hash, $name, @aa)  = @_;
     my ($cmd, @args)        = @aa;
@@ -388,7 +382,7 @@ sub XiaomiBTLESens_Get($$@) {
     if( $cmd eq 'sensorData' ) {
         return "usage: sensorData" if( @args != 0 );
     
-        XiaomiBTLESens_stateRequest($hash);
+        stateRequest($hash);
         
     } elsif( $cmd eq 'firmware' ) {
         return "usage: firmware" if( @args != 0 );
@@ -407,12 +401,12 @@ sub XiaomiBTLESens_Get($$@) {
     }
 
 
-    XiaomiBTLESens_CreateParamGatttool($hash,$mod,$handle) if( $cmd ne 'sensorData' );
+    CreateParamGatttool($hash,$mod,$handle) if( $cmd ne 'sensorData' );
 
     return undef;
 }
 
-sub XiaomiBTLESens_CreateParamGatttool($@) {
+sub CreateParamGatttool($@) {
 
     my ($hash,$mod,$handle,$value)  = @_;
     my $name                        = $hash->{NAME};
@@ -422,14 +416,14 @@ sub XiaomiBTLESens_CreateParamGatttool($@) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - Run CreateParamGatttool with mod: $mod";
     
      if( $mod eq 'read' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens::ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle, "XiaomiBTLESens::ExecGatttool_Done", 90, "XiaomiBTLESens::ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","read sensor data",1);
     
         Log3 $name, 5, "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle";
 
      } elsif( $mod eq 'write' ) {
-        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens_ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value."|".$XiaomiModels{AttrVal($name,'model','')}{wdatalisten}, "XiaomiBTLESens_ExecGatttool_Done", 90, "XiaomiBTLESens_ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
+        $hash->{helper}{RUNNING_PID} = BlockingCall("XiaomiBTLESens::ExecGatttool_Run", $name."|".$mac."|".$mod."|".$handle."|".$value."|".$XiaomiModels{AttrVal($name,'model','')}{wdatalisten}, "XiaomiBTLESens::ExecGatttool_Done", 90, "XiaomiBTLESens::ExecGatttool_Aborted", $hash) unless( exists($hash->{helper}{RUNNING_PID}) );
         
         readingsSingleUpdate($hash,"state","write sensor data",1);
     
@@ -437,7 +431,7 @@ sub XiaomiBTLESens_CreateParamGatttool($@) {
     }
 }
 
-sub XiaomiBTLESens_ExecGatttool_Run($) {
+sub ExecGatttool_Run($) {
 
     my $string      = shift;
     
@@ -516,13 +510,13 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
             $gtResult[1] =~ s/\\n//g;
         }
 
-        $json_notification = XiaomiBTLESens_encodeJSON($gtResult[1]);
+        $json_notification = encodeJSON($gtResult[1]);
         
         if($gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
         } elsif($gtResult[0] ne 'connect error' and $gattCmd eq 'write') {
             if( $sshHost ne 'none' ) {
-                XiaomiBTLESens_ExecGatttool_Run($name."|".$mac."|read|0x35");
+                ExecGatttool_Run($name."|".$mac."|read|0x35");
             } else {
                 return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
             }
@@ -530,12 +524,12 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
             return "$name|$mac|error|$gattCmd|$handle|$json_notification";
         }
     } else {
-        $json_notification = XiaomiBTLESens_encodeJSON('no gatttool binary found. Please check if bluez-package is properly installed');
+        $json_notification = encodeJSON('no gatttool binary found. Please check if bluez-package is properly installed');
         return "$name|$mac|error|$gattCmd|$handle|$json_notification";
     }
 }
 
-sub XiaomiBTLESens_ExecGatttool_Done($) {
+sub ExecGatttool_Done($) {
 
     my $string      = shift;
     my ($name,$mac,$respstate,$gattCmd,$handle,$json_notification) = split("\\|", $string);
@@ -557,17 +551,17 @@ sub XiaomiBTLESens_ExecGatttool_Done($) {
     
     
     if( $respstate eq 'ok' and $gattCmd eq 'write' and AttrVal($name,'model','none') eq 'flowerSens' ) {
-        XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{rdata});
+        CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{rdata});
         
     } elsif( $respstate eq 'ok' ) {
-        XiaomiBTLESens_ProcessingNotification($hash,$gattCmd,$handle,$decode_json->{gtResult});
+        ProcessingNotification($hash,$gattCmd,$handle,$decode_json->{gtResult});
         
     } else {
-        XiaomiBTLESens_ProcessingErrors($hash,$decode_json->{gtResult});
+        ProcessingErrors($hash,$decode_json->{gtResult});
     }
 }
 
-sub XiaomiBTLESens_ExecGatttool_Aborted($) {
+sub ExecGatttool_Aborted($) {
 
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
@@ -577,12 +571,12 @@ sub XiaomiBTLESens_ExecGatttool_Aborted($) {
     readingsSingleUpdate($hash,"state","unreachable", 1);
     
     $readings{'lastGattError'} = 'The BlockingCall Process terminated unexpectedly. Timedout';
-    XiaomiBTLESens_WriteReadings($hash,\%readings);
+    WriteReadings($hash,\%readings);
 
     Log3 $name, 4, "XiaomiBTLESens ($name) - ExecGatttool_Aborted: The BlockingCall Process terminated unexpectedly. Timedout";
 }
 
-sub XiaomiBTLESens_ProcessingNotification($@) {
+sub ProcessingNotification($@) {
 
     my ($hash,$gattCmd,$handle,$notification)   = @_;
     
@@ -597,13 +591,13 @@ sub XiaomiBTLESens_ProcessingNotification($@) {
             ### Flower Sens - Read Firmware and Battery Data
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x38";
             
-            $readings = XiaomiBTLESens_FlowerSensHandle0x38($hash,$notification);
+            $readings = FlowerSensHandle0x38($hash,$notification);
             
         } elsif( $handle eq '0x35' ) {
             ### Flower Sens - Read Sensor Data
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x35";
             
-            $readings = XiaomiBTLESens_FlowerSensHandle0x35($hash,$notification);
+            $readings = FlowerSensHandle0x35($hash,$notification);
         }
         
     } elsif( AttrVal($name,'model','none') eq 'thermoHygroSens') {
@@ -611,37 +605,37 @@ sub XiaomiBTLESens_ProcessingNotification($@) {
             ### Thermo/Hygro Sens - Read Battery Data
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18";
             
-            $readings = XiaomiBTLESens_ThermoHygroSensHandle0x18($hash,$notification);
+            $readings = ThermoHygroSensHandle0x18($hash,$notification);
         }
         
         elsif( $handle eq '0x10' ) {
             ### Thermo/Hygro Sens - Read Sensor Data
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x10";
             
-            $readings = XiaomiBTLESens_ThermoHygroSensHandle0x10($hash,$notification);
+            $readings = ThermoHygroSensHandle0x10($hash,$notification);
         }
         
         elsif( $handle eq '0x24' ) {
             ### Thermo/Hygro Sens - Read Firmware Data
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x24";
         
-            $readings = XiaomiBTLESens_ThermoHygroSensHandle0x24($hash,$notification)
+            $readings = ThermoHygroSensHandle0x24($hash,$notification)
         }
         
         elsif( $handle eq '0x3' ) {
             ### Thermo/Hygro Sens - Read and Write Devicename
             Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3";
         
-            return XiaomiBTLESens_CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) unless($gattCmd eq 'read');
-            $readings = XiaomiBTLESens_ThermoHygroSensHandle0x3($hash,$notification)
+            return CreateParamGatttool($hash,'read',$XiaomiModels{AttrVal($name,'model','')}{devicename}) unless($gattCmd eq 'read');
+            $readings = ThermoHygroSensHandle0x3($hash,$notification)
         }
     }
     
     
-    XiaomiBTLESens_WriteReadings($hash,$readings);
+    WriteReadings($hash,$readings);
 }
 
-sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
+sub FlowerSensHandle0x38($$) {
     ### FlowerSens - Read Firmware and Battery Data
     my ($hash,$notification)    = @_;
     
@@ -660,11 +654,11 @@ sub XiaomiBTLESens_FlowerSensHandle0x38($$) {
     $readings{'firmware'}       = ($dataBatFw[2]-30).".".($dataBatFw[4]-30).".".($dataBatFw[6]-30);
         
     $hash->{helper}{CallBattery} = 1;
-    XiaomiBTLESens_CallBattery_Timestamp($hash);
+    CallBattery_Timestamp($hash);
     return \%readings;
 }
 
-sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
+sub FlowerSensHandle0x35($$) {
     ### Flower Sens - Read Sensor Data
     my ($hash,$notification)    = @_;
     
@@ -677,7 +671,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     my @dataSensor  = split(" ",$notification);
 
 
-    return XiaomiBTLESens_stateRequest($hash)
+    return stateRequest($hash)
     unless( $dataSensor[0] ne "aa" and $dataSensor[1] ne "bb" and $dataSensor[2] ne "cc" and $dataSensor[3] ne "dd" and $dataSensor[4] ne "ee" and $dataSensor[5] ne "ff");
         
     if( $dataSensor[1] eq "ff" ) {
@@ -696,7 +690,7 @@ sub XiaomiBTLESens_FlowerSensHandle0x35($$) {
     return \%readings;
 }
 
-sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
+sub ThermoHygroSensHandle0x18($$) {
     ### Thermo/Hygro Sens - Battery Data
     my ($hash,$notification)    = @_;
     
@@ -713,11 +707,11 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x18($$) {
     $readings{'batteryState'}        = (hex("0x".$notification) > 15 ? "ok" : "low");
         
     $hash->{helper}{CallBattery} = 1;
-    XiaomiBTLESens_CallBattery_Timestamp($hash);
+    CallBattery_Timestamp($hash);
     return \%readings;
 }
 
-sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
+sub ThermoHygroSensHandle0x10($$) {
     ### Thermo/Hygro Sens - Read Sensor Data
     my ($hash,$notification)    = @_;
     
@@ -727,7 +721,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10";
     
-    return XiaomiBTLESens_stateRequest($hash)
+    return stateRequest($hash)
     unless($notification =~ /^([0-9a-f]{2}(\s?))*$/);
     
     my @numberOfHex = split(' ',$notification);
@@ -747,7 +741,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x10($$) {
     return \%readings;
 }
 
-sub XiaomiBTLESens_ThermoHygroSensHandle0x24($$) {
+sub ThermoHygroSensHandle0x24($$) {
     ### Thermo/Hygro Sens - Read Firmware Data
     my ($hash,$notification)    = @_;
     
@@ -765,7 +759,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x24($$) {
     return \%readings;
 }
 
-sub XiaomiBTLESens_ThermoHygroSensHandle0x3($$) {
+sub ThermoHygroSensHandle0x3($$) {
     ### Thermo/Hygro Sens - Read and Write Devicename
     my ($hash,$notification)    = @_;
     
@@ -783,7 +777,7 @@ sub XiaomiBTLESens_ThermoHygroSensHandle0x3($$) {
     return \%readings;
 }
 
-sub XiaomiBTLESens_WriteReadings($$) {
+sub WriteReadings($$) {
 
     my ($hash,$readings)    = @_;
     
@@ -827,10 +821,10 @@ sub XiaomiBTLESens_WriteReadings($$) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - WriteReadings: Readings were written";
 
     $hash->{helper}{CallSensDataCounter} = 0;
-    XiaomiBTLESens_stateRequest($hash) if( $hash->{helper}{CallBattery} == 1 );
+    stateRequest($hash) if( $hash->{helper}{CallBattery} == 1 );
 }
 
-sub XiaomiBTLESens_ProcessingErrors($$) {
+sub ProcessingErrors($$) {
 
     my ($hash,$notification)    = @_;
     
@@ -840,11 +834,11 @@ sub XiaomiBTLESens_ProcessingErrors($$) {
     Log3 $name, 4, "XiaomiBTLESens ($name) - ProcessingErrors";
     $readings{'lastGattError'} = $notification;
     
-    XiaomiBTLESens_WriteReadings($hash,\%readings);
+    WriteReadings($hash,\%readings);
 }
 
 #### my little Helper
-sub XiaomiBTLESens_encodeJSON($) {
+sub encodeJSON($) {
 
     my $gtResult    = shift;
     
@@ -859,7 +853,7 @@ sub XiaomiBTLESens_encodeJSON($) {
 }
 
 ## Routinen damit Firmware und Batterie nur alle X male statt immer aufgerufen wird
-sub XiaomiBTLESens_CallBattery_Timestamp($) {
+sub CallBattery_Timestamp($) {
 
     my $hash    = shift;
     
@@ -869,7 +863,7 @@ sub XiaomiBTLESens_CallBattery_Timestamp($) {
     $hash->{helper}{updateTimestampCallBattery} = FmtDateTime(gettimeofday());
 }
 
-sub XiaomiBTLESens_CallBattery_UpdateTimeAge($) {
+sub CallBattery_UpdateTimeAge($) {
 
     my $hash    = shift;
 
@@ -880,15 +874,15 @@ sub XiaomiBTLESens_CallBattery_UpdateTimeAge($) {
     return $UpdateTimeAge;
 }
 
-sub XiaomiBTLESens_CallBattery_IsUpdateTimeAgeToOld($$) {
+sub CallBattery_IsUpdateTimeAgeToOld($$) {
 
     my ($hash,$maxAge)    = @_;;
     
     
-    return (XiaomiBTLESens_CallBattery_UpdateTimeAge($hash)>$maxAge ? 1:0);
+    return (CallBattery_UpdateTimeAge($hash)>$maxAge ? 1:0);
 }
 
-sub XiaomiBTLESens_CreateDevicenameHEX($) {
+sub CreateDevicenameHEX($) {
 
     my $devicename      = shift;
     
