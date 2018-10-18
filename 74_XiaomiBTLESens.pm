@@ -460,7 +460,7 @@ sub XiaomiBTLESens_ExecGatttool_Run($) {
         my $sshHost                                 = AttrVal($name,"sshHost","none");
         my $hci                                     = AttrVal($name,"hciDevice","hci0");
         
-        $cmd                                        = "ssh $sshHost '" if($sshHost ne 'none');
+        $cmd                                        .= "ssh $sshHost '" if($sshHost ne 'none');
         $cmd                                        .= "timeout 10 " if($listen);
         $cmd                                        .= "gatttool -i $hci -b $mac ";
         $cmd                                        .= "--char-read -a $handle" if($gattCmd eq 'read');
