@@ -111,7 +111,8 @@ BEGIN {
           RemoveInternalTimer
           DoTrigger
           BlockingKill
-          BlockingCall)
+          BlockingCall
+          FmtDateTime)
     );
 }
 
@@ -218,7 +219,7 @@ sub Attr(@) {
 "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
               unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
             Log3 $name, 3, "XiaomiBTLESens ($name) - disabledForIntervals";
-            XiaomiBTLESens_stateRequest($hash);
+            stateRequest($hash);
         }
 
         elsif ( $cmd eq "del" ) {
