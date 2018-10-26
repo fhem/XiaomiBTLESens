@@ -888,13 +888,7 @@ sub ThermoHygroSensHandle0x10($$) {
 
     $notification =~ s/\s+//g;
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-
-#     if ( scalar(@numberOfHex) < 14 ) {
-        $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
-#     }
-#     else {
-#         $readings{'humidity'} = pack( 'H*', substr( $notification, 16, 8 ) );
-#     }
+    $readings{'humidity'} = pack( 'H*', substr( $notification, 18, 8 ) );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
