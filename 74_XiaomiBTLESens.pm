@@ -34,6 +34,7 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 
 my $version = "2.4.7";
 
@@ -41,12 +42,12 @@ sub XiaomiBTLESens_Initialize($) {
 
     my ($hash) = @_;
 
-    $hash->{SetFn}    = "XiaomiBTLESens::Set";
-    $hash->{GetFn}    = "XiaomiBTLESens::Get";
-    $hash->{DefFn}    = "XiaomiBTLESens::Define";
-    $hash->{NotifyFn} = "XiaomiBTLESens::Notify";
-    $hash->{UndefFn}  = "XiaomiBTLESens::Undef";
-    $hash->{AttrFn}   = "XiaomiBTLESens::Attr";
+    $hash->{SetFn}    = "FHEM::XiaomiBTLESens::Set";
+    $hash->{GetFn}    = "FHEM::XiaomiBTLESens::Get";
+    $hash->{DefFn}    = "FHEM::XiaomiBTLESens::Define";
+    $hash->{NotifyFn} = "FHEM::XiaomiBTLESens::Notify";
+    $hash->{UndefFn}  = "FHEM::XiaomiBTLESens::Undef";
+    $hash->{AttrFn}   = "FHEM::XiaomiBTLESens::Attr";
     $hash->{AttrList} =
         "interval "
       . "disable:1 "
@@ -70,6 +71,8 @@ sub XiaomiBTLESens_Initialize($) {
         my $hash = $modules{XiaomiBTLESens}{defptr}{$d};
         $hash->{VERSION} = $version;
     }
+    
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 package XiaomiBTLESens;
@@ -79,6 +82,7 @@ my $missingModul = "";
 use strict;
 use warnings;
 use POSIX;
+use FHEM::Meta;
 
 use GPUtils qw(GP_Import)
   ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
@@ -152,6 +156,7 @@ sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
 
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
     return "too few parameters: define <name> XiaomiBTLESens <BTMAC>"
       if ( @a != 3 );
     return
@@ -394,7 +399,7 @@ sub stateRequestTimer($) {
     stateRequest($hash);
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL} + int( rand(300) ),
-        "XiaomiBTLESens::stateRequestTimer", $hash );
+        "FHEM::XiaomiBTLESens::stateRequestTimer", $hash );
 
     Log3 $name, 4,
       "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
@@ -493,11 +498,11 @@ sub CreateParamGatttool($@) {
 
     if ( $mod eq 'read' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "XiaomiBTLESens::ExecGatttool_Run",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
             $name . "|" . $mac . "|" . $mod . "|" . $handle,
-            "XiaomiBTLESens::ExecGatttool_Done",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
             90,
-            "XiaomiBTLESens::ExecGatttool_Aborted",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
             $hash
         ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
 
@@ -509,16 +514,16 @@ sub CreateParamGatttool($@) {
     }
     elsif ( $mod eq 'write' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "XiaomiBTLESens::ExecGatttool_Run",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
             $name . "|"
               . $mac . "|"
               . $mod . "|"
               . $handle . "|"
               . $value . "|"
               . $XiaomiModels{ AttrVal( $name, 'model', '' ) }{wdatalisten},
-            "XiaomiBTLESens::ExecGatttool_Done",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
             90,
-            "XiaomiBTLESens::ExecGatttool_Aborted",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
             $hash
         ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
 
@@ -1291,5 +1296,51 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 74_XiaomiBTLESens.pm
+{
+  "abstract": "Modul to retrieves data from a Xiaomi BTLE Sensors",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul um Daten vom Xiaomi BTLE Sensoren aus zu lesen"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Flower",
+    "BTLE",
+    "Xiaomi",
+    "Sensor",
+    "Bluetooth LE"
+  ],
+  "release_status": "stable",
+  "license": "GPL_2",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 0,
+        "Blocking": 0,
+        "JSON": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 
 =cut
