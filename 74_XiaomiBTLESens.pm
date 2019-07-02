@@ -30,7 +30,7 @@
 #$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x38";   # Firmware und Batterie
 #  e8 00 00 58 0f 00 00 34 f1 02 02 3c 00 fb 34 9b
 
-package XiaomiBTLESens;
+package FHEM::XiaomiBTLESens;
 
 my $missingModul = "";
 
@@ -39,8 +39,7 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import GP_Export);
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -118,7 +117,10 @@ eval "use Blocking;1" or $missingModul .= "Blocking ";
 #use Data::Dumper;          only for Debugging
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
