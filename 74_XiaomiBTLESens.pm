@@ -141,6 +141,7 @@ BEGIN {
           BlockingKill
           BlockingCall
           FmtDateTime
+          readingFnAttributes
           makeDeviceName)
     );
 }
