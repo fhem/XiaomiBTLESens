@@ -208,7 +208,7 @@ sub Initialize($) {
       . "model:flowerSens,thermoHygroSens "
       . "blockingCallLoglevel:2,3,4,5 "
       . $readingFnAttributes;
-    
+
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -222,7 +222,7 @@ sub Define($$) {
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
-    
+
     return "too few parameters: define <name> XiaomiBTLESens <BTMAC>"
       if ( @a != 3 );
     return
@@ -232,13 +232,13 @@ sub Define($$) {
     my $name = $a[0];
     my $mac  = $a[2];
 
-    $hash->{BTMAC}                          = $mac;
-    $hash->{VERSION}                        = version->parse($VERSION)->normal;
-    $hash->{INTERVAL}                       = 300;
-    $hash->{helper}{CallSensDataCounter}    = 0;
-    $hash->{helper}{CallBattery}            = 0;
-    $hash->{NOTIFYDEV}                      = "global,$name";
-    $hash->{loglevel}                       = 4;
+    $hash->{BTMAC}                       = $mac;
+    $hash->{VERSION}                     = version->parse($VERSION)->normal;
+    $hash->{INTERVAL}                    = 300;
+    $hash->{helper}{CallSensDataCounter} = 0;
+    $hash->{helper}{CallBattery}         = 0;
+    $hash->{NOTIFYDEV}                   = "global,$name";
+    $hash->{loglevel}                    = 4;
 
     readingsSingleUpdate( $hash, "state", "initialized", 0 );
     CommandAttr( undef, $name . ' room XiaomiBTLESens' )
@@ -498,10 +498,12 @@ sub Set($$@) {
     }
     else {
         my $list = "";
-        $list .= "resetBatteryTimestamp:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
+        $list .= "resetBatteryTimestamp:noArg"
+          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+            and AttrVal( $name, 'model', 'none' ) ne 'none' );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -541,10 +543,12 @@ sub Get($$@) {
     }
     else {
         my $list = "";
-        $list .= "sensorData:noArg firmware:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
+        $list .= "sensorData:noArg firmware:noArg"
+          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename:noArg"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+            and AttrVal( $name, 'model', 'none' ) ne 'none' );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -962,7 +966,20 @@ sub ThermoHygroSensHandle0x10($$) {
     $notification =~ s/\s+//g;
 
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-    $readings{'humidity'} = pack( 'H*', substr( $notification, ( (scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and $readings{'temperature'} > 9)) ? 18 : 16 ), 8 ) );
+    $readings{'humidity'} = pack(
+        'H*',
+        substr(
+            $notification,
+            (
+                (
+                    scalar(@numberOfHex) == 14
+                      or ( scalar(@numberOfHex) == 13
+                        and $readings{'temperature'} > 9 )
+                ) ? 18 : 16
+            ),
+            8
+        )
+    );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
