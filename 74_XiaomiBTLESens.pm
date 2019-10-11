@@ -152,6 +152,7 @@ BEGIN {
 GP_Export(
     qw(
       Initialize
+      stateRequestTimer
       )
 );
 
@@ -489,7 +490,7 @@ sub stateRequestTimer($) {
     stateRequest($hash);
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL} + int( rand(300) ),
-        "FHEM::XiaomiBTLESens::stateRequestTimer", $hash );
+        "XiaomiBTLESens_stateRequestTimer", $hash );
 
     Log3 $name, 4,
       "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
