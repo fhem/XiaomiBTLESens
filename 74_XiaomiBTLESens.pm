@@ -873,12 +873,12 @@ sub ProcessingNotification($@) {
         }
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' ) {
-        if ( $handle eq '0x3a' ) {
+        if ( $handle eq '0x3b' ) {
             ### Clear Grass Sens - Read Battery Data
             Log3 $name, 4,
-              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3a";
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3b";
 
-            $readings = ClearGrassSensHandle0x3a( $hash, $notification );
+            $readings = ClearGrassSensHandle0x3b( $hash, $notification );
         }
         elsif ( $handle eq '0x1e' ) {
             ### Clear Grass Sens - Read Sensor Data
@@ -1072,22 +1072,22 @@ sub ThermoHygroSensHandle0x3($$) {
     return \%readings;
 }
 
-sub ClearGrassSensHandle0x3a($$) {
+sub ClearGrassSensHandle0x3b($$) {
     ### Clear Grass Sens - Battery Data
     my ( $hash, $notification ) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
 
-    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x3a";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x3b";
 
     chomp($notification);
     $notification =~ s/\s+//g;
 
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
-    $readings{'batteryPercent'} = hex( "0x" . $notification );
+    $readings{'batteryPercent'} = hex( substr( $notification, 14, 2 ) );
     $readings{'batteryState'} =
-      ( hex( "0x" . $notification ) > 15 ? "ok" : "low" );
+      ( hex( substr( $notification, 14, 2 ) ) > 15 ? "ok" : "low" );
 
     $hash->{helper}{CallBattery} = 1;
     CallBattery_Timestamp($hash);
