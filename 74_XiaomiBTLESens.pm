@@ -172,6 +172,15 @@ my %XiaomiModels = (
         'firmware'    => '0x24',
         'devicename'  => '0x3'
     },
+    clearGrassSens => {
+        'rdata'       => '0x1e',
+        'wdata'       => '0x10',
+        'wdataValue'  => '0100',
+        'wdatalisten' => 2,
+        'battery'     => '0x19',
+        'firmware'    => '0x2a',
+        'devicename'  => '0x3'
+    },
 );
 
 my %CallBatteryAge = (
@@ -208,7 +217,7 @@ sub Initialize($) {
       . "minLux "
       . "maxLux "
       . "sshHost "
-      . "model:flowerSens,thermoHygroSens "
+      . "model:flowerSens,thermoHygroSens,clearGrassSens "
       . "blockingCallLoglevel:2,3,4,5 "
       . $readingFnAttributes;
 
@@ -427,7 +436,9 @@ sub stateRequest($) {
                 )
               );
 
-            if ( $hash->{helper}{CallSensDataCounter} < 1 ) {
+            if (  $hash->{helper}{CallSensDataCounter} < 1 
+              and AttrVal( $name, 'model', '' ) ne 'clearGrassSens' )
+            {
                 CreateParamGatttool(
                     $hash,
                     'write',
@@ -438,13 +449,23 @@ sub stateRequest($) {
                   $hash->{helper}{CallSensDataCounter} + 1;
 
             }
+            elsif ( $hash->{helper}{CallSensDataCounter} < 1 
+              and AttrVal( $name, 'model', '' ) eq 'clearGrassSens' )
+            {
+                CreateParamGatttool(
+                    $hash,
+                    'read',
+                    $XiaomiModels{ AttrVal( $name, 'model', '' ) }{rdata},
+                );
+                $hash->{helper}{CallSensDataCounter} =
+                  $hash->{helper}{CallSensDataCounter} + 1;
+            }
             else {
                 $readings{'lastGattError'} = 'charWrite faild';
                 WriteReadings( $hash, \%readings );
                 $hash->{helper}{CallSensDataCounter} = 0;
                 return;
             }
-
         }
         else {
 
@@ -827,7 +848,6 @@ sub ProcessingNotification($@) {
 
             $readings = ThermoHygroSensHandle0x18( $hash, $notification );
         }
-
         elsif ( $handle eq '0x10' ) {
             ### Thermo/Hygro Sens - Read Sensor Data
             Log3 $name, 4,
@@ -835,7 +855,6 @@ sub ProcessingNotification($@) {
 
             $readings = ThermoHygroSensHandle0x10( $hash, $notification );
         }
-
         elsif ( $handle eq '0x24' ) {
             ### Thermo/Hygro Sens - Read Firmware Data
             Log3 $name, 4,
@@ -843,7 +862,6 @@ sub ProcessingNotification($@) {
 
             $readings = ThermoHygroSensHandle0x24( $hash, $notification );
         }
-
         elsif ( $handle eq '0x3' ) {
             ### Thermo/Hygro Sens - Read and Write Devicename
             Log3 $name, 4,
@@ -853,6 +871,39 @@ sub ProcessingNotification($@) {
                 $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
               unless ( $gattCmd eq 'read' );
             $readings = ThermoHygroSensHandle0x3( $hash, $notification );
+        }
+    }
+    elsif ( AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' ) {
+        if ( $handle eq '0x19' ) {
+            ### Clear Grass Sens - Read Battery Data
+            Log3 $name, 4,
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18";
+
+            $readings = ClearGrassSensHandle0x19( $hash, $notification );
+        }
+        elsif ( $handle eq '0x1e' ) {
+            ### Clear Grass Sens - Read Sensor Data
+            Log3 $name, 4,
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1e";
+
+            $readings = ClearGrassSensHandle0x1e( $hash, $notification );
+        }
+        elsif ( $handle eq '0x2a' ) {
+            ### Clear Grass Sens - Read Firmware Data
+            Log3 $name, 4,
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x2a";
+
+            $readings = ClearGrassSensHandle0x2a( $hash, $notification );
+        }
+        elsif ( $handle eq '0x3' ) {
+            ### Clear Grass Sens - Read and Write Devicename
+            Log3 $name, 4,
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3";
+
+            return CreateParamGatttool( $hash, 'read',
+                $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
+              unless ( $gattCmd eq 'read' );
+            $readings = ClearGrassSensHandle0x3( $hash, $notification );
         }
     }
 
@@ -1013,6 +1064,85 @@ sub ThermoHygroSensHandle0x3($$) {
     my %readings;
 
     Log3 $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x3";
+
+    $notification =~ s/\s+//g;
+
+    $readings{'devicename'} = pack( 'H*', $notification );
+
+    $hash->{helper}{CallBattery} = 0;
+    return \%readings;
+}
+
+sub ClearGrassSensHandle0x19($$) {
+    ### Clear Grass Sens - Battery Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x19";
+
+    chomp($notification);
+    $notification =~ s/\s+//g;
+
+    ### neue Vereinheitlichung für Batteriereadings Forum #800017
+    $readings{'batteryPercent'} = hex( "0x" . $notification );
+    $readings{'batteryState'} =
+      ( hex( "0x" . $notification ) > 15 ? "ok" : "low" );
+
+    $hash->{helper}{CallBattery} = 1;
+    CallBattery_Timestamp($hash);
+    return \%readings;
+}
+
+sub ClearGrassSensHandle0x1e($$) {
+    ### Clear Grass Sens - Read Sensor Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x1e";
+
+    return stateRequest($hash)
+      unless ( $notification =~ /^([0-9a-f]{2}(\s?))*$/ );
+
+    my @numberOfHex = split( ' ', $notification );
+
+    $notification =~ s/\s+//g;
+
+    $readings{'temperature'} = hex(substr( $notification, 4, 2 ) )/10;
+    $readings{'humidity'} = hex(substr( $notification, 8, 2 ) );
+
+    $hash->{helper}{CallBattery} = 0;
+    return \%readings;
+}
+
+sub ClearGrassSensHandle0x2a($$) {
+    ### Clear Grass Sens - Read Firmware Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x2a";
+
+    $notification =~ s/\s+//g;
+
+    $readings{'firmware'} = pack( 'H*', $notification );
+
+    $hash->{helper}{CallBattery} = 0;
+    return \%readings;
+}
+
+sub ClearGrassSensHandle0x3($$) {
+    ### Clear Grass Sens - Read and Write Devicename
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x3";
 
     $notification =~ s/\s+//g;
 
@@ -1402,7 +1532,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.6.0",
+  "version": "v2.7.53",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
