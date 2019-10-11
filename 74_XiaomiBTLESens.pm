@@ -178,7 +178,7 @@ my %XiaomiModels = (
         'wdata'       => '0x10',
         'wdataValue'  => '0100',
         'wdatalisten' => 2,
-        'battery'     => '0x19',
+        'battery'     => '0x3a',
         'firmware'    => '0x2a',
         'devicename'  => '0x3'
     },
@@ -873,12 +873,12 @@ sub ProcessingNotification($@) {
         }
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' ) {
-        if ( $handle eq '0x19' ) {
+        if ( $handle eq '0x3a' ) {
             ### Clear Grass Sens - Read Battery Data
             Log3 $name, 4,
-              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x18";
+              "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3a";
 
-            $readings = ClearGrassSensHandle0x19( $hash, $notification );
+            $readings = ClearGrassSensHandle0x3a( $hash, $notification );
         }
         elsif ( $handle eq '0x1e' ) {
             ### Clear Grass Sens - Read Sensor Data
@@ -1072,14 +1072,14 @@ sub ThermoHygroSensHandle0x3($$) {
     return \%readings;
 }
 
-sub ClearGrassSensHandle0x19($$) {
+sub ClearGrassSensHandle0x3a($$) {
     ### Clear Grass Sens - Battery Data
     my ( $hash, $notification ) = @_;
 
     my $name = $hash->{NAME};
     my %readings;
 
-    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x19";
+    Log3 $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x3a";
 
     chomp($notification);
     $notification =~ s/\s+//g;
@@ -1535,7 +1535,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.7.54",
+  "version": "v2.7.56",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
