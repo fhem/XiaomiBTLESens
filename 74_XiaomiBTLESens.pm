@@ -1112,7 +1112,7 @@ sub ClearGrassSensHandle0x1e($$) {
     $notification =~ s/\s+//g;
 
     $readings{'temperature'} = hex(substr( $notification, 4, 2 ) )/10;
-    $readings{'humidity'} = hex(substr( $notification, 8, 2 ) );
+    $readings{'humidity'}  = hex(substr($notification,11,1) .substr($notification,8,2))/10;
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -1532,7 +1532,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.7.53",
+  "version": "v2.7.54",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
