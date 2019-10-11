@@ -437,8 +437,8 @@ sub stateRequest($) {
                 )
               );
 
-            if (  $hash->{helper}{CallSensDataCounter} < 1 
-              and AttrVal( $name, 'model', '' ) ne 'clearGrassSens' )
+            if ( $hash->{helper}{CallSensDataCounter} < 1
+                and AttrVal( $name, 'model', '' ) ne 'clearGrassSens' )
             {
                 CreateParamGatttool(
                     $hash,
@@ -450,12 +450,10 @@ sub stateRequest($) {
                   $hash->{helper}{CallSensDataCounter} + 1;
 
             }
-            elsif ( $hash->{helper}{CallSensDataCounter} < 1 
-              and AttrVal( $name, 'model', '' ) eq 'clearGrassSens' )
+            elsif ( $hash->{helper}{CallSensDataCounter} < 1
+                and AttrVal( $name, 'model', '' ) eq 'clearGrassSens' )
             {
-                CreateParamGatttool(
-                    $hash,
-                    'read',
+                CreateParamGatttool( $hash, 'read',
                     $XiaomiModels{ AttrVal( $name, 'model', '' ) }{rdata},
                 );
                 $hash->{helper}{CallSensDataCounter} =
@@ -1112,8 +1110,10 @@ sub ClearGrassSensHandle0x1e($$) {
 
     $notification =~ s/\s+//g;
 
-    $readings{'temperature'} = hex(substr( $notification, 4, 2 ) )/10;
-    $readings{'humidity'}  = hex(substr($notification,11,1) .substr($notification,8,2))/10;
+    $readings{'temperature'} = hex( substr( $notification, 4, 2 ) ) / 10;
+    $readings{'humidity'} =
+      hex( substr( $notification, 11, 1 ) . substr( $notification, 8, 2 ) ) /
+      10;
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -1176,7 +1176,9 @@ sub WriteReadings($$) {
               . ReadingsVal( $name, 'temperature', 0 ) . ' H: '
               . ReadingsVal( $name, 'humidity',    0 )
         )
-    ) if ( AttrVal( $name, 'model', 'none' ) eq 'thermoHygroSens' );
+      )
+      if ( AttrVal( $name, 'model', 'none' ) eq 'thermoHygroSens'
+        or AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' );
 
     readingsEndUpdate( $hash, 1 );
 
