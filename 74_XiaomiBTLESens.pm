@@ -178,7 +178,7 @@ my %XiaomiModels = (
         'wdata'       => '0x10',
         'wdataValue'  => '0100',
         'wdatalisten' => 2,
-        'battery'     => '0x3a',
+        'battery'     => '0x3b',
         'firmware'    => '0x2a',
         'devicename'  => '0x3'
     },
@@ -1535,7 +1535,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.7.56",
+  "version": "v2.7.60",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
