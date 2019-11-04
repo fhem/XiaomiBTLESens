@@ -1535,7 +1535,7 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.7.60",
+  "version": "v2.8.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
