@@ -1548,7 +1548,7 @@ sub BTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.8.0",
+  "version": "v2.8.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
