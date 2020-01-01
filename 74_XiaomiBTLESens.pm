@@ -5,6 +5,10 @@
 #  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
+#  Special thanks goes to:
+#       -  Charlie71: add special patch
+#
+#
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
