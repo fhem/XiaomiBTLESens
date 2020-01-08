@@ -634,7 +634,7 @@ sub CreateParamGatttool($@) {
 
 sub Gatttool_executeCommand($) {
     my $command = join( ' ', @_ );
-    ( $_ = qx{$command 2>&1}, $? >> 8 );
+    return ( $_ = qx{$command 2>&1}, $? >> 8 );
 }
 
 sub ExecGatttool_Run($) {
