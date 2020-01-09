@@ -724,12 +724,13 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
             Log3($name, 5,
               "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result "
               . join( ",", @gtResult ));
-            $loop++;
 
             $returnCode = 2
               unless ( defined( $gtResult[0] ) );
 
-            #        } while ( $loop < 5 and $gtResult[0] eq 'connect error' );
+            print('DEBUG BTLESens!!! - Exit Code: ' . $returnCode . "\n");
+              
+            $loop++;
         } while ( $loop < 5 and $returnCode != 0 );
         Log3($name, 3,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: errorcode: \"$returnCode\", ErrorString: \"$returnString\"")
