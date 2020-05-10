@@ -36,7 +36,7 @@
 
 package FHEM::XiaomiBTLESens;
 
-my $missingModul = "";
+my $missingModul = q{};
 
 use strict;
 use warnings;
@@ -207,23 +207,23 @@ sub Initialize {
     $hash->{UndefFn}  = \&Undef;
     $hash->{AttrFn}   = \&Attr;
     $hash->{AttrList} =
-        "interval "
-      . "disable:1 "
-      . "disabledForIntervals "
-      . "hciDevice:hci0,hci1,hci2 "
-      . "batteryFirmwareAge:8h,16h,24h,32h,40h,48h "
-      . "minFertility "
-      . "maxFertility "
-      . "minTemp "
-      . "maxTemp "
-      . "minMoisture "
-      . "maxMoisture "
-      . "minLux "
-      . "maxLux "
-      . "sshHost "
-      . "psCommand "
-      . "model:flowerSens,thermoHygroSens,clearGrassSens "
-      . "blockingCallLoglevel:2,3,4,5 "
+        'interval '
+      . 'disable:1 '
+      . 'disabledForIntervals '
+      . 'hciDevice:hci0,hci1,hci2 '
+      . 'batteryFirmwareAge:8h,16h,24h,32h,40h,48h '
+      . 'minFertility '
+      . 'maxFertility '
+      . 'minTemp '
+      . 'maxTemp '
+      . 'minMoisture '
+      . 'maxMoisture '
+      . 'minLux '
+      . 'maxLux '
+      . 'sshHost '
+      . 'psCommand '
+      . 'model:flowerSens,thermoHygroSens,clearGrassSens '
+      . 'blockingCallLoglevel:2,3,4,5 '
       . $readingFnAttributes;
     $hash->{parseParams} = 1;
 
@@ -234,10 +234,10 @@ sub Define {
     my $hash = shift;
     my $a    = shift;
 
-    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    return $@ if ( !FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
-    return "too few parameters: define <name> XiaomiBTLESens <BTMAC>"
+    return 'too few parameters: define <name> XiaomiBTLESens <BTMAC>'
       if ( scalar( @{$a} ) != 3 );
     return
 "Cannot define XiaomiBTLESens device. Perl modul ${missingModul}is missing."
@@ -251,10 +251,10 @@ sub Define {
     $hash->{INTERVAL}                    = 300;
     $hash->{helper}{CallSensDataCounter} = 0;
     $hash->{helper}{CallBattery}         = 0;
-    $hash->{NOTIFYDEV}                   = "global,$name";
+    $hash->{NOTIFYDEV}                   = 'global,' . $name;
     $hash->{loglevel}                    = 4;
 
-    readingsSingleUpdate( $hash, "state", "initialized", 0 );
+    readingsSingleUpdate( $hash, 'state', 'initialized', 0 );
     CommandAttr( undef, $name . ' room XiaomiBTLESens' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
 
@@ -287,44 +287,44 @@ sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
-    if ( $attrName eq "disable" ) {
-        if ( $cmd eq "set" and $attrVal eq "1" ) {
+    if ( $attrName eq 'disable' ) {
+        if ( $cmd eq 'set' && $attrVal == 1 ) {
             RemoveInternalTimer($hash);
 
-            readingsSingleUpdate( $hash, "state", "disabled", 1 );
+            readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
             Log3( $name, 3, "XiaomiBTLESens ($name) - disabled" );
         }
 
-        elsif ( $cmd eq "del" ) {
+        elsif ( $cmd eq 'del' ) {
             Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
         }
     }
 
-    elsif ( $attrName eq "disabledForIntervals" ) {
-        if ( $cmd eq "set" ) {
+    elsif ( $attrName eq 'disabledForIntervals' ) {
+        if ( $cmd eq 'set' ) {
             return
-"check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
-              unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
+'check disabledForIntervals Syntax HH:MM-HH:MM or HH:MM-HH:MM HH:MM-HH:MM ...'
+              if ( $attrVal !~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
             Log3( $name, 3, "XiaomiBTLESens ($name) - disabledForIntervals" );
             stateRequest($hash);
         }
 
-        elsif ( $cmd eq "del" ) {
+        elsif ( $cmd eq 'del' ) {
             Log3( $name, 3, "XiaomiBTLESens ($name) - enabled" );
-            readingsSingleUpdate( $hash, "state", "active", 1 );
+            readingsSingleUpdate( $hash, 'state', 'active', 1 );
         }
     }
 
-    elsif ( $attrName eq "interval" ) {
+    elsif ( $attrName eq 'interval' ) {
         RemoveInternalTimer($hash);
 
-        if ( $cmd eq "set" ) {
+        if ( $cmd eq 'set' ) {
             if ( $attrVal < 120 ) {
                 Log3( $name, 3,
 "XiaomiBTLESens ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)"
                 );
                 return
-"interval too small, please use something >= 120 (sec), default is 300 (sec)";
+'interval too small, please use something >= 120 (sec), default is 300 (sec)';
             }
             else {
                 $hash->{INTERVAL} = $attrVal;
@@ -333,22 +333,22 @@ sub Attr {
             }
         }
 
-        elsif ( $cmd eq "del" ) {
+        elsif ( $cmd eq 'del' ) {
             $hash->{INTERVAL} = 300;
             Log3( $name, 3,
                 "XiaomiBTLESens ($name) - set interval to default" );
         }
     }
 
-    elsif ( $attrName eq "blockingCallLoglevel" ) {
-        if ( $cmd eq "set" ) {
+    elsif ( $attrName eq 'blockingCallLoglevel' ) {
+        if ( $cmd eq 'set' ) {
             $hash->{loglevel} = $attrVal;
             Log3( $name, 3,
                 "XiaomiBTLESens ($name) - set blockingCallLoglevel to $attrVal"
             );
         }
 
-        elsif ( $cmd eq "del" ) {
+        elsif ( $cmd eq 'del' ) {
             $hash->{loglevel} = 4;
             Log3( $name, 3,
                 "XiaomiBTLESens ($name) - set blockingCallLoglevel to default"
@@ -391,13 +391,13 @@ sub Notify {
                     or grep /^ATTR.$name.interval.[0-9]+/,
                     @{$events}
                 )
-                and $devname eq 'global'
+                && $devname eq 'global'
             )
             or grep /^resetBatteryTimestamp$/,
             @{$events}
         )
-        and $init_done
-        or (
+        && $init_done
+        || (
             (
                 grep /^INITIALIZED$/,
                 @{$events}
@@ -406,7 +406,7 @@ sub Notify {
                 or grep /^MODIFIED.$name$/,
                 @{$events}
             )
-            and $devname eq 'global'
+            && $devname eq 'global'
         )
       );
 
@@ -414,8 +414,8 @@ sub Notify {
         $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
       if (
             AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-        and $devname eq $name
-        and grep /^$name.firmware.+/,
+        && $devname eq $name
+        && grep /^$name.firmware.+/,
         @{$events}
       );
 
@@ -429,7 +429,7 @@ sub stateRequest {
     my %readings;
 
     if ( AttrVal( $name, 'model', 'none' ) eq 'none' ) {
-        readingsSingleUpdate( $hash, "state", "set attribute model first", 1 );
+        readingsSingleUpdate( $hash, 'state', 'set attribute model first', 1 );
 
     }
     elsif ( !IsDisabled($name) ) {
@@ -446,7 +446,7 @@ sub stateRequest {
               );
 
             if ( $hash->{helper}{CallSensDataCounter} < 1
-                and AttrVal( $name, 'model', '' ) ne 'clearGrassSens' )
+                && AttrVal( $name, 'model', '' ) ne 'clearGrassSens' )
             {
                 CreateParamGatttool(
                     $hash,
@@ -459,7 +459,7 @@ sub stateRequest {
 
             }
             elsif ( $hash->{helper}{CallSensDataCounter} < 1
-                and AttrVal( $name, 'model', '' ) eq 'clearGrassSens' )
+                && AttrVal( $name, 'model', '' ) eq 'clearGrassSens' )
             {
                 CreateParamGatttool( $hash, 'read',
                     $XiaomiModels{ AttrVal( $name, 'model', '' ) }{rdata},
@@ -482,7 +482,7 @@ sub stateRequest {
 
     }
     else {
-        readingsSingleUpdate( $hash, "state", "disabled", 1 );
+        readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
     }
 
     return;
@@ -497,7 +497,7 @@ sub stateRequestTimer {
     stateRequest($hash);
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL} + int( rand(300) ),
-        "XiaomiBTLESens_stateRequestTimer", $hash );
+        'XiaomiBTLESens_stateRequestTimer', $hash );
 
     Log3( $name, 4,
         "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer" );
@@ -516,7 +516,7 @@ sub Set($$@) {
     my $value = 'write';
 
     if ( $cmd eq 'devicename' ) {
-        return "usage: devicename <name>" if ( scalar( @{$a} ) < 1 );
+        return 'usage: devicename <name>' if ( scalar( @{$a} ) < 1 );
 
         $mod    = 'write';
         $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
@@ -524,20 +524,20 @@ sub Set($$@) {
 
     }
     elsif ( $cmd eq 'resetBatteryTimestamp' ) {
-        return "usage: resetBatteryTimestamp" if ( scalar( @{$a} ) != 0 );
+        return 'usage: resetBatteryTimestamp' if ( scalar( @{$a} ) != 0 );
 
         $hash->{helper}{updateTimeCallBattery} = 0;
         return;
 
     }
     else {
-        my $list = "";
-        $list .= "resetBatteryTimestamp:noArg"
-          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
-        $list .= " devicename"
+        my $list = q{};
+        $list .= 'resetBatteryTimestamp:noArg'
+          if ( AttrVal( $name, 'model', 'none' ) ne 'none' );
+        $list .= ' devicename'
           if (
             AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-            and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            && AttrVal( $name, 'model', 'none' ) ne 'none' );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -557,13 +557,13 @@ sub Get {
     my $handle;
 
     if ( $cmd eq 'sensorData' ) {
-        return "usage: sensorData" if ( scalar( @{$a} ) != 0 );
+        return 'usage: sensorData' if ( scalar( @{$a} ) != 0 );
 
         stateRequest($hash);
 
     }
     elsif ( $cmd eq 'firmware' ) {
-        return "usage: firmware" if ( scalar( @{$a} ) != 0 );
+        return 'usage: firmware' if ( scalar( @{$a} ) != 0 );
 
         $mod = 'read';
         $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{firmware};
@@ -577,13 +577,13 @@ sub Get {
 
     }
     else {
-        my $list = "";
-        $list .= "sensorData:noArg firmware:noArg"
-          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
-        $list .= " devicename:noArg"
+        my $list = q{};
+        $list .= 'sensorData:noArg firmware:noArg'
+          if ( AttrVal( $name, 'model', 'none' ) ne 'none' );
+        $list .= ' devicename:noArg'
           if (
             AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-            and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            && AttrVal( $name, 'model', 'none' ) ne 'none' );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -603,15 +603,15 @@ sub CreateParamGatttool {
 
     if ( $mod eq 'read' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
-            $name . "|" . $mac . "|" . $mod . "|" . $handle,
-            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
+            'FHEM::XiaomiBTLESens::ExecGatttool_Run',
+            $name . '|' . $mac . '|' . $mod . '|' . $handle,
+            'FHEM::XiaomiBTLESens::ExecGatttool_Done',
             90,
-            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
+            'FHEM::XiaomiBTLESens::ExecGatttool_Aborted',
             $hash
-        ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
+        ) if ( !exists( $hash->{helper}{RUNNING_PID} ) );
 
-        readingsSingleUpdate( $hash, "state", "read sensor data", 1 );
+        readingsSingleUpdate( $hash, 'state', 'read sensor data', 1 );
 
         Log3( $name, 5,
 "XiaomiBTLESens ($name) - Read XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle"
@@ -620,20 +620,20 @@ sub CreateParamGatttool {
     }
     elsif ( $mod eq 'write' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
-            $name . "|"
-              . $mac . "|"
-              . $mod . "|"
-              . $handle . "|"
-              . $value . "|"
+            'FHEM::XiaomiBTLESens::ExecGatttool_Run',
+            $name . '|'
+              . $mac . '|'
+              . $mod . '|'
+              . $handle . '|'
+              . $value . '|'
               . $XiaomiModels{ AttrVal( $name, 'model', '' ) }{wdatalisten},
-            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
+            'FHEM::XiaomiBTLESens::ExecGatttool_Done',
             90,
-            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
+            'FHEM::XiaomiBTLESens::ExecGatttool_Aborted',
             $hash
-        ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
+        ) if ( !exists( $hash->{helper}{RUNNING_PID} ) );
 
-        readingsSingleUpdate( $hash, "state", "write sensor data", 1 );
+        readingsSingleUpdate( $hash, 'state', 'write sensor data', 1 );
 
         Log3( $name, 5,
 "XiaomiBTLESens ($name) - Write XiaomiBTLESens_ExecGatttool_Run $name|$mac|$mod|$handle|$value"
@@ -652,8 +652,8 @@ sub ExecGatttool_Run {
     my $string = shift;
 
     my ( $name, $mac, $gattCmd, $handle, $value, $listen ) =
-      split( "\\|", $string );
-    my $sshHost = AttrVal( $name, "sshHost", "none" );
+      split( '\|', $string );
+    my $sshHost = AttrVal( $name, 'sshHost', 'none' );
     my $gatttool;
     my $json_notification;
 
@@ -661,14 +661,14 @@ sub ExecGatttool_Run {
     $gatttool = qx(ssh $sshHost 'which gatttool') if ( $sshHost ne 'none' );
     chomp $gatttool;
 
-    if ( defined($gatttool) and ($gatttool) ) {
+    if ( defined($gatttool) && ($gatttool) ) {
 
         my $cmd;
         my $loop;
         my @gtResult;
         my $wait    = 1;
-        my $sshHost = AttrVal( $name, "sshHost", "none" );
-        my $hci     = AttrVal( $name, "hciDevice", "hci0" );
+        my $sshHost = AttrVal( $name, 'sshHost', 'none' );
+        my $hci     = AttrVal( $name, 'hciDevice', 'hci0' );
 
         $cmd .= "ssh $sshHost '"         if ( $sshHost ne 'none' );
         $cmd .= "timeout 10 "            if ($listen);
@@ -682,12 +682,11 @@ sub ExecGatttool_Run {
         $cmd .= " 2>&1";
         $cmd .= "'" if ( $sshHost ne 'none' );
 
-#        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'"
         $cmd =
 "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 '"
           if (  $sshHost ne 'none'
-            and $gattCmd eq 'write'
-            and AttrVal( $name, "model", "none" ) eq 'flowerSens' );
+            && $gattCmd eq 'write'
+            && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
 
         while ($wait) {
 
@@ -730,22 +729,20 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
             );
 
             ( $returnString, $returnCode ) = Gatttool_executeCommand($cmd);
-            @gtResult = split( ": ", $returnString );
-
-            #           @gtResult = split( ": ", qx($cmd) );
+            @gtResult = split( ': ', $returnString );
 
             Log3( $name, 5,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result "
-                  . join( ",", @gtResult ) );
+                  . join( ',', @gtResult ) );
 
             $returnCode = 2
-              unless ( defined( $gtResult[0] ) );
+              if ( !defined( $gtResult[0] ) );
 
             $loop++;
-        } while ( $loop < 5 and ( $returnCode != 0 and $returnCode != 124 ) );
+        } while ( $loop < 5 && ( $returnCode != 0 && $returnCode != 124 ) );
         Log3( $name, 3,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: errorcode: \"$returnCode\", ErrorString: \"$returnString\""
-        ) if ( $returnCode != 0 and $returnCode != 124 );
+        ) if ( $returnCode != 0 && $returnCode != 124 );
 
         Log3( $name, 4,
             "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool result "
@@ -753,18 +750,18 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
 
         $handle = '0x35'
           if (  $sshHost ne 'none'
-            and $gattCmd eq 'write'
-            and AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
+            && $gattCmd eq 'write'
+            && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
         $gattCmd = 'read'
           if (  $sshHost ne 'none'
-            and $gattCmd eq 'write'
-            and AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
+            && $gattCmd eq 'write'
+            && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
 
         $gtResult[1] = 'no data response'
-          unless ( defined( $gtResult[1] ) );
+          if ( !defined( $gtResult[1] ) );
 
-        if ( $gtResult[1] ne 'no data response' and $listen ) {
-            ( $gtResult[1] ) = split( "\n", $gtResult[1] );
+        if ( $gtResult[1] ne 'no data response' && $listen ) {
+            ( $gtResult[1] ) = split( '\n', $gtResult[1] );
             $gtResult[1] =~ s/\\n//g;
         }
 
@@ -773,7 +770,7 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
         if ( $gtResult[1] =~ /^([0-9a-f]{2}(\s?))*$/ ) {
             return "$name|$mac|ok|$gattCmd|$handle|$json_notification";
         }
-        elsif ( $returnCode == 0 and $gattCmd eq 'write' ) {
+        elsif ( $returnCode == 0 && $gattCmd eq 'write' ) {
             if ( $sshHost ne 'none' ) {
                 ExecGatttool_Run( $name . "|" . $mac . "|read|0x35" );
             }
@@ -799,7 +796,7 @@ sub ExecGatttool_Done {
     my $string = shift;
 
     my ( $name, $mac, $respstate, $gattCmd, $handle, $json_notification ) =
-      split( "\\|", $string );
+      split( '\|', $string );
 
     my $hash = $defs{$name};
 
@@ -822,8 +819,8 @@ sub ExecGatttool_Done {
     }
 
     if (    $respstate eq 'ok'
-        and $gattCmd eq 'write'
-        and AttrVal( $name, 'model', 'none' ) eq 'flowerSens' )
+        && $gattCmd eq 'write'
+        && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' )
     {
         CreateParamGatttool( $hash, 'read',
             $XiaomiModels{ AttrVal( $name, 'model', '' ) }{rdata} );
@@ -848,7 +845,7 @@ sub ExecGatttool_Aborted {
     my %readings;
 
     delete( $hash->{helper}{RUNNING_PID} );
-    readingsSingleUpdate( $hash, "state", "unreachable", 1 );
+    readingsSingleUpdate( $hash, 'state', 'unreachable', 1 );
 
     $readings{'lastGattError'} =
       'The BlockingCall Process terminated unexpectedly. Timedout';
@@ -921,7 +918,7 @@ sub ProcessingNotification {
 
             return CreateParamGatttool( $hash, 'read',
                 $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
-              unless ( $gattCmd eq 'read' );
+              if ( $gattCmd ne 'read' );
             $readings = ThermoHygroSensHandle0x3( $hash, $notification );
         }
     }
@@ -957,7 +954,7 @@ sub ProcessingNotification {
 
             return CreateParamGatttool( $hash, 'read',
                 $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
-              unless ( $gattCmd eq 'read' );
+              if ( $gattCmd ne 'read' );
             $readings = ClearGrassSensHandle0x3( $hash, $notification );
         }
     }
@@ -975,7 +972,7 @@ sub FlowerSensHandle0x38 {
 
     Log3( $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x38" );
 
-    my @dataBatFw = split( " ", $notification );
+    my @dataBatFw = split( /\s/, $notification );
 
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( "0x" . $dataBatFw[0] );
@@ -1003,15 +1000,15 @@ sub FlowerSensHandle0x35 {
 
     Log3( $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x35" );
 
-    my @dataSensor = split( " ", $notification );
+    my @dataSensor = split( /\s/, $notification );
 
     return stateRequest($hash)
-      unless ( $dataSensor[0] ne "aa"
-        and $dataSensor[1] ne "bb"
-        and $dataSensor[2] ne "cc"
-        and $dataSensor[3] ne "dd"
-        and $dataSensor[4] ne "ee"
-        and $dataSensor[5] ne "ff" );
+      if ( $dataSensor[0] eq "aa"
+        && $dataSensor[1] eq "bb"
+        && $dataSensor[2] eq "cc"
+        && $dataSensor[3] eq "dd"
+        && $dataSensor[4] eq "ee"
+        && $dataSensor[5] eq "ff" );
 
     if ( $dataSensor[1] eq "ff" ) {
         $readings{'temperature'} =
@@ -1056,7 +1053,7 @@ sub ThermoHygroSensHandle0x18 {
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( "0x" . $notification );
     $readings{'batteryState'} =
-      ( hex( "0x" . $notification ) > 15 ? "ok" : "low" );
+      ( hex( "0x" . $notification ) > 15 ? 'ok' : 'low' );
 
     $hash->{helper}{CallBattery} = 1;
     CallBattery_Timestamp($hash);
@@ -1075,9 +1072,9 @@ sub ThermoHygroSensHandle0x10 {
     Log3( $name, 4, "XiaomiBTLESens ($name) - Thermo/Hygro Sens Handle0x10" );
 
     return stateRequest($hash)
-      unless ( $notification =~ /^([0-9a-f]{2}(\s?))*$/ );
+      if ( $notification !~ /^([0-9a-f]{2}(\s?))*$/ );
 
-    my @numberOfHex = split( ' ', $notification );
+    my @numberOfHex = split( /\s/, $notification );
 
     $notification =~ s/\s+//g;
 
@@ -1089,8 +1086,8 @@ sub ThermoHygroSensHandle0x10 {
             (
                 (
                     scalar(@numberOfHex) == 14
-                      or ( scalar(@numberOfHex) == 13
-                        and $readings{'temperature'} > 9 )
+                      || ( scalar(@numberOfHex) == 13
+                        && $readings{'temperature'} > 9 )
                 ) ? 18 : 16
             ),
             8
@@ -1156,7 +1153,7 @@ sub ClearGrassSensHandle0x3b {
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( substr( $notification, 14, 2 ) );
     $readings{'batteryState'} =
-      ( hex( substr( $notification, 14, 2 ) ) > 15 ? "ok" : "low" );
+      ( hex( substr( $notification, 14, 2 ) ) > 15 ? 'ok' : 'low' );
 
     $hash->{helper}{CallBattery} = 1;
     CallBattery_Timestamp($hash);
@@ -1175,9 +1172,9 @@ sub ClearGrassSensHandle0x1e {
     Log3( $name, 4, "XiaomiBTLESens ($name) - Clear Grass Sens Handle0x1e" );
 
     return stateRequest($hash)
-      unless ( $notification =~ /^([0-9a-f]{2}(\s?))*$/ );
+      if ( $notification !~ /^([0-9a-f]{2}(\s?))*$/ );
 
-    my @numberOfHex = split( ' ', $notification );
+    my @numberOfHex = split( /\s/, $notification );
 
     $notification =~ s/\s+//g;
 
@@ -1254,7 +1251,7 @@ sub WriteReadings {
         )
       )
       if ( AttrVal( $name, 'model', 'none' ) eq 'thermoHygroSens'
-        or AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' );
+        || AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' );
 
     readingsEndUpdate( $hash, 1 );
 
