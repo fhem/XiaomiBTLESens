@@ -7,6 +7,7 @@
 #
 #  Special thanks goes to:
 #       -  Charlie71: add special patch
+#       -  Holger S: patch to support Mijia LYWSD03MMC devices
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -669,7 +670,7 @@ sub CreateParamGatttool {
 }
 
 sub Gatttool_executeCommand {
-    my $command = join( ' ', @_ );
+    my $command = join q{ }, @_;
     return ( $_ = qx{$command 2>&1}, $? >> 8 );
 }
 
@@ -758,7 +759,7 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
 
             Log3( $name, 5,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result "
-                  . join( ',', @gtResult ) );
+                  . join q{,}, @gtResult );
 
             $returnCode = 2
               if ( !defined( $gtResult[0] ) );
@@ -771,7 +772,7 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
 
         Log3( $name, 4,
             "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool result "
-              . join( ",", @gtResult ) );
+              . join q{,}, @gtResult );
 
         $handle = '0x35'
           if ( $sshHost ne 'none'
