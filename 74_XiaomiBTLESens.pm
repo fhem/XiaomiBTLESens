@@ -186,6 +186,14 @@ my %XiaomiModels = (
         'firmware'    => '0x2a',
         'devicename'  => '0x3'
     },
+    mijiaLYWSD03MMC => {
+        'wdata'       => '0x38',
+        'wdataValue'  => '0100',
+        'wdatalisten' => 3,
+        'battery'     => '0x1b',
+        'firmware'    => '0x12',
+        'devicename'  => '0x3'
+    },
 );
 
 my %CallBatteryAge = (
@@ -222,7 +230,7 @@ sub Initialize {
       . 'maxLux '
       . 'sshHost '
       . 'psCommand '
-      . 'model:flowerSens,thermoHygroSens,clearGrassSens '
+      . 'model:flowerSens,thermoHygroSens,clearGrassSens,mijiaLYWSD03MMC '
       . 'blockingCallLoglevel:2,3,4,5 '
       . $readingFnAttributes;
     $hash->{parseParams} = 1;
@@ -413,7 +421,10 @@ sub Notify {
     CreateParamGatttool( $hash, 'read',
         $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
       if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+        (
+               AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+            || AttrVal( $name, 'model', 'mijiaLYWSD03MMC' ) eq 'mijiaLYWSD03MMC'
+        )
         && $devname eq $name
         && grep /^$name.firmware.+/,
         @{$events}
@@ -506,10 +517,11 @@ sub stateRequestTimer {
 }
 
 sub Set($$@) {
-    my $hash        = shift;
-    my $arg_ref     = shift;
-    my $name        = shift @$arg_ref;
-    my $cmd         = shift @$arg_ref // return qq{"set $name" needs at least one argument};
+    my $hash    = shift;
+    my $arg_ref = shift;
+    my $name    = shift @$arg_ref;
+    my $cmd     = shift @$arg_ref
+      // return qq{"set $name" needs at least one argument};
 
     my $mod;
     my $handle;
@@ -536,8 +548,14 @@ sub Set($$@) {
           if ( AttrVal( $name, 'model', 'none' ) ne 'none' );
         $list .= ' devicename'
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-            && AttrVal( $name, 'model', 'none' ) ne 'none' );
+            (
+                AttrVal( $name, 'model', 'thermoHygroSens' ) eq
+                'thermoHygroSens'
+                || AttrVal( $name, 'model', 'mijiaLYWSD03MMC' ) eq
+                'mijiaLYWSD03MMC'
+            )
+            && AttrVal( $name, 'model', 'none' ) ne 'none'
+          );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -548,10 +566,11 @@ sub Set($$@) {
 }
 
 sub Get {
-    my $hash        = shift;
-    my $arg_ref     = shift;
-    my $name        = shift @$arg_ref;
-    my $cmd         = shift @$arg_ref // return qq{"set $name" needs at least one argument};
+    my $hash    = shift;
+    my $arg_ref = shift;
+    my $name    = shift @$arg_ref;
+    my $cmd     = shift @$arg_ref
+      // return qq{"set $name" needs at least one argument};
 
     my $mod = 'read';
     my $handle;
@@ -582,8 +601,14 @@ sub Get {
           if ( AttrVal( $name, 'model', 'none' ) ne 'none' );
         $list .= ' devicename:noArg'
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
-            && AttrVal( $name, 'model', 'none' ) ne 'none' );
+            (
+                AttrVal( $name, 'model', 'thermoHygroSens' ) eq
+                'thermoHygroSens'
+                || AttrVal( $name, 'model', 'mijiaLYWSD03MMC' ) eq
+                'mijiaLYWSD03MMC'
+            )
+            && AttrVal( $name, 'model', 'none' ) ne 'none'
+          );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -684,7 +709,7 @@ sub ExecGatttool_Run {
 
         $cmd =
 "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 '"
-          if (  $sshHost ne 'none'
+          if ( $sshHost ne 'none'
             && $gattCmd eq 'write'
             && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
 
@@ -749,11 +774,11 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
               . join( ",", @gtResult ) );
 
         $handle = '0x35'
-          if (  $sshHost ne 'none'
+          if ( $sshHost ne 'none'
             && $gattCmd eq 'write'
             && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
         $gattCmd = 'read'
-          if (  $sshHost ne 'none'
+          if ( $sshHost ne 'none'
             && $gattCmd eq 'write'
             && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' );
 
@@ -818,7 +843,7 @@ sub ExecGatttool_Done {
         );
     }
 
-    if (    $respstate eq 'ok'
+    if (   $respstate eq 'ok'
         && $gattCmd eq 'write'
         && AttrVal( $name, 'model', 'none' ) eq 'flowerSens' )
     {
@@ -920,6 +945,42 @@ sub ProcessingNotification {
                 $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
               if ( $gattCmd ne 'read' );
             $readings = ThermoHygroSensHandle0x3( $hash, $notification );
+        }
+    }
+    elsif ( AttrVal( $name, 'model', 'none' ) eq 'mijiaLYWSD03MMC' ) {
+        if ( $handle eq '0x1b' ) {
+            ### mijiaLYWSD03MMC - Read Battery Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x1b"
+            );
+
+            $readings = mijiaLYWSD03MMC_Handle0x1b( $hash, $notification );
+        }
+        elsif ( $handle eq '0x38' ) {
+            ### mijiaLYWSD03MMC - Read Sensor Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x38"
+            );
+
+            $readings = mijiaLYWSD03MMC_Handle0x38( $hash, $notification );
+        }
+        elsif ( $handle eq '0x12' ) {
+            ### mijiaLYWSD03MMC - Read Firmware Data
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x12"
+            );
+
+            $readings = mijiaLYWSD03MMC_Handle0x12( $hash, $notification );
+        }
+        elsif ( $handle eq '0x3' ) {
+            ### mijiaLYWSD03MMC - Read and Write Devicename
+            Log3( $name, 4,
+                "XiaomiBTLESens ($name) - ProcessingNotification: handle 0x3" );
+
+            return CreateParamGatttool( $hash, 'read',
+                $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename} )
+              unless ( $gattCmd eq 'read' );
+            $readings = mijiaLYWSD03MMC_Handle0x3( $hash, $notification );
         }
     }
     elsif ( AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' ) {
@@ -1085,8 +1146,7 @@ sub ThermoHygroSensHandle0x10 {
             $notification,
             (
                 (
-                    scalar(@numberOfHex) == 14
-                      || ( scalar(@numberOfHex) == 13
+                    scalar(@numberOfHex) == 14 || ( scalar(@numberOfHex) == 13
                         && $readings{'temperature'} > 9 )
                 ) ? 18 : 16
             ),
@@ -1134,6 +1194,85 @@ sub ThermoHygroSensHandle0x3 {
 
     $hash->{helper}{CallBattery} = 0;
 
+    return \%readings;
+}
+
+sub mijiaLYWSD03MMC_Handle0x1b($$) {
+    ### mijiaLYWSD03MMC - Battery Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3( $name, 4, "XiaomiBTLESens ($name) - mijiaLYWSD03MMC Handle0x1b" );
+
+    chomp($notification);
+    $notification =~ s/\s+//g;
+
+    ### neue Vereinheitlichung für Batteriereadings Forum #800017
+    $readings{'batteryPercent'} = $notification; ###hex( "0x" . $notification );
+    $readings{'batteryState'} =
+      ( hex( "0x" . $notification ) > 15 ? "ok" : "low" );
+
+    $hash->{helper}{CallBattery} = 1;
+    CallBattery_Timestamp($hash);
+    return \%readings;
+}
+
+sub mijiaLYWSD03MMC_Handle0x38($$) {
+    ### mijiaLYWSD03MMC - Read Sensor Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3( $name, 4, "XiaomiBTLESens ($name) - mijiaLYWSD03MMC Handle0x38" );
+
+    return stateRequest($hash)
+      unless ( $notification =~ /^([0-9a-f]{2}(\s?))*$/ );
+
+    my @splitVal = split( ' ', $notification );
+
+    $notification =~ s/\s+//g;
+
+    $readings{'temperature'} = hex( "0x" . $splitVal[1] . $splitVal[0] ) / 100;
+    $readings{'humidity'}    = hex( "0x" . $splitVal[2] );
+
+    $hash->{helper}{CallBattery} = 0;
+    return \%readings;
+}
+
+sub mijiaLYWSD03MMC_Handle0x12($$) {
+    ### mijiaLYWSD03MMC - Read Firmware Data
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3( $name, 4, "XiaomiBTLESens ($name) - mijiaLYWSD03MMC Handle0x12" );
+
+    $notification =~ s/\s+//g;
+
+    $readings{'firmware'} = pack( 'H*', $notification );
+
+    $hash->{helper}{CallBattery} = 0;
+    return \%readings;
+}
+
+sub mijiaLYWSD03MMC_Handle0x3($$) {
+    ### mijiaLYWSD03MMC - Read and Write Devicename
+    my ( $hash, $notification ) = @_;
+
+    my $name = $hash->{NAME};
+    my %readings;
+
+    Log3( $name, 4, "XiaomiBTLESens ($name) - mijiaLYWSD03MMC Handle0x3" );
+
+    $notification =~ s/\s+//g;
+
+    $readings{'devicename'} = pack( 'H*', $notification );
+
+    $hash->{helper}{CallBattery} = 0;
     return \%readings;
 }
 
@@ -1251,6 +1390,7 @@ sub WriteReadings {
         )
       )
       if ( AttrVal( $name, 'model', 'none' ) eq 'thermoHygroSens'
+        || AttrVal( $name, 'model', 'none' ) eq 'mijiaLYWSD03MMC'
         || AttrVal( $name, 'model', 'none' ) eq 'clearGrassSens' );
 
     readingsEndUpdate( $hash, 1 );
@@ -1606,7 +1746,7 @@ sub BTLE_CmdlinePreventGrepFalsePositive {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.9.1",
+  "version": "v3.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
