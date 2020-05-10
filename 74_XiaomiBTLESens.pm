@@ -231,20 +231,20 @@ sub Initialize {
 }
 
 sub Define {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash    = shift;
+    my $arg_ref = shift;
 
     return $@ if ( !FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'too few parameters: define <name> XiaomiBTLESens <BTMAC>'
-      if ( scalar( @{$a} ) != 3 );
+      if ( scalar( @{$arg_ref} ) != 3 );
     return
 "Cannot define XiaomiBTLESens device. Perl modul ${missingModul}is missing."
       if ($missingModul);
 
-    my $name = $a->[0];
-    my $mac  = $a->[2];
+    my $name = $arg_ref->[0];
+    my $mac  = $arg_ref->[2];
 
     $hash->{BTMAC}                       = $mac;
     $hash->{VERSION}                     = version->parse($VERSION)->normal;
@@ -506,25 +506,25 @@ sub stateRequestTimer {
 }
 
 sub Set($$@) {
-    my $hash = shift;
-    my $a    = shift;
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
+    my $hash        = shift;
+    my $arg_ref     = shift;
+    my $name        = shift @$arg_ref;
+    my $cmd         = shift @$arg_ref // return qq{"set $name" needs at least one argument};
 
     my $mod;
     my $handle;
     my $value = 'write';
 
     if ( $cmd eq 'devicename' ) {
-        return 'usage: devicename <name>' if ( scalar( @{$a} ) < 1 );
+        return 'usage: devicename <name>' if ( scalar( @{$arg_ref} ) < 1 );
 
         $mod    = 'write';
         $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
-        $value  = CreateDevicenameHEX( makeDeviceName( $a->[0] ) );
+        $value  = CreateDevicenameHEX( makeDeviceName( $arg_ref->[0] ) );
 
     }
     elsif ( $cmd eq 'resetBatteryTimestamp' ) {
-        return 'usage: resetBatteryTimestamp' if ( scalar( @{$a} ) != 0 );
+        return 'usage: resetBatteryTimestamp' if ( scalar( @{$arg_ref} ) != 0 );
 
         $hash->{helper}{updateTimeCallBattery} = 0;
         return;
@@ -548,29 +548,29 @@ sub Set($$@) {
 }
 
 sub Get {
-    my $hash = shift;
-    my $a    = shift;
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
+    my $hash        = shift;
+    my $arg_ref     = shift;
+    my $name        = shift @$arg_ref;
+    my $cmd         = shift @$arg_ref // return qq{"set $name" needs at least one argument};
 
     my $mod = 'read';
     my $handle;
 
     if ( $cmd eq 'sensorData' ) {
-        return 'usage: sensorData' if ( scalar( @{$a} ) != 0 );
+        return 'usage: sensorData' if ( scalar( @{$arg_ref} ) != 0 );
 
         stateRequest($hash);
 
     }
     elsif ( $cmd eq 'firmware' ) {
-        return 'usage: firmware' if ( scalar( @{$a} ) != 0 );
+        return 'usage: firmware' if ( scalar( @{$arg_ref} ) != 0 );
 
         $mod = 'read';
         $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{firmware};
 
     }
     elsif ( $cmd eq 'devicename' ) {
-        return "usage: devicename" if ( scalar( @{$a} ) != 0 );
+        return "usage: devicename" if ( scalar( @{$arg_ref} ) != 0 );
 
         $mod = 'read';
         $handle = $XiaomiModels{ AttrVal( $name, 'model', '' ) }{devicename};
