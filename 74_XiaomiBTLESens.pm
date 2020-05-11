@@ -678,7 +678,7 @@ sub ExecGatttool_Run {
     my $string = shift;
 
     my ( $name, $mac, $gattCmd, $handle, $value, $listen ) =
-      split( '\|', $string );
+      split '\|', $string;
     my $sshHost = AttrVal( $name, 'sshHost', 'none' );
     my $gatttool;
     my $json_notification;
@@ -755,7 +755,7 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
             );
 
             ( $returnString, $returnCode ) = Gatttool_executeCommand($cmd);
-            @gtResult = split( ': ', $returnString );
+            @gtResult = split /:\s/, $returnString;
 
             Log3( $name, 5,
 "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result "
@@ -787,7 +787,7 @@ qx(ssh $sshHost '$psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
           if ( !defined( $gtResult[1] ) );
 
         if ( $gtResult[1] ne 'no data response' && $listen ) {
-            ( $gtResult[1] ) = split( '\n', $gtResult[1] );
+            ( $gtResult[1] ) = split '\n', $gtResult[1];
             $gtResult[1] =~ s/\\n//g;
         }
 
@@ -822,7 +822,7 @@ sub ExecGatttool_Done {
     my $string = shift;
 
     my ( $name, $mac, $respstate, $gattCmd, $handle, $json_notification ) =
-      split( '\|', $string );
+      split /\|/, $string;
 
     my $hash = $defs{$name};
 
@@ -1034,7 +1034,7 @@ sub FlowerSensHandle0x38 {
 
     Log3( $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x38" );
 
-    my @dataBatFw = split( /\s/, $notification );
+    my @dataBatFw = split /\s/, $notification;
 
     ### neue Vereinheitlichung für Batteriereadings Forum #800017
     $readings{'batteryPercent'} = hex( "0x" . $dataBatFw[0] );
@@ -1062,7 +1062,7 @@ sub FlowerSensHandle0x35 {
 
     Log3( $name, 4, "XiaomiBTLESens ($name) - FlowerSens Handle0x35" );
 
-    my @dataSensor = split( /\s/, $notification );
+    my @dataSensor = split /\s/, $notification;
 
     return stateRequest($hash)
       if ( $dataSensor[0] eq "aa"
@@ -1136,7 +1136,7 @@ sub ThermoHygroSensHandle0x10 {
     return stateRequest($hash)
       if ( $notification !~ /^([0-9a-f]{2}(\s?))*$/ );
 
-    my @numberOfHex = split( /\s/, $notification );
+    my @numberOfHex = split /\s/, $notification;
 
     $notification =~ s/\s+//g;
 
@@ -1232,7 +1232,7 @@ sub mijiaLYWSD03MMC_Handle0x38($$) {
     return stateRequest($hash)
       unless ( $notification =~ /^([0-9a-f]{2}(\s?))*$/ );
 
-    my @splitVal = split( ' ', $notification );
+    my @splitVal = split /\s/, $notification;
 
     $notification =~ s/\s+//g;
 
@@ -1314,7 +1314,7 @@ sub ClearGrassSensHandle0x1e {
     return stateRequest($hash)
       if ( $notification !~ /^([0-9a-f]{2}(\s?))*$/ );
 
-    my @numberOfHex = split( /\s/, $notification );
+    my @numberOfHex = split /\s/, $notification;
 
     $notification =~ s/\s+//g;
 
